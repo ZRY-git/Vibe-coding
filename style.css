@@ -1,0 +1,194 @@
+/* 学英语变强 · Day 7 MVP 样式 */
+:root {
+  --bg: #f6f5f0;
+  --card: #ffffff;
+  --ink: #2c2c2a;
+  --muted: #888780;
+  --line: #d3d1c7;
+  --green: #0f6e56;
+  --green-soft: #e1f5ee;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.6;
+}
+
+.topbar {
+  padding: 24px 32px 8px;
+}
+.topbar h1 { margin: 0; font-size: 26px; }
+.tagline { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+
+main { padding: 8px 32px 32px; }
+
+/* 视图切换：一次只显示一个页面 */
+.view {
+  display: none;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+.view.active { display: block; }
+.view > h2 {
+  margin: 0 0 16px;
+  font-size: 18px;
+  border-left: 4px solid var(--green);
+  padding-left: 10px;
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: var(--green-soft);
+}
+.panel h3 { margin: 0 0 10px; font-size: 15px; }
+
+.stats { list-style: none; margin: 0 0 10px; padding: 0; }
+.stats li {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.stats b { font-size: 15px; }
+
+.slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.slot {
+  border: 1.5px dashed var(--muted);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--muted);
+  background: #fff;
+}
+
+.hint { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; align-items: center; }
+
+button, .pack-card {
+  padding: 10px 24px;
+  font-size: 15px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  font-family: inherit;
+}
+button.primary {
+  border: none;
+  background: var(--green);
+  color: #fff;
+}
+button:hover { border-color: var(--green); }
+button.primary:hover { background: #0a5544; }
+
+select, input[type="text"] {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+
+/* 词组卡片 */
+.pack-card {
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1.5px dashed var(--muted);
+}
+.pack-card b { font-size: 15px; }
+.pack-card span { font-size: 12px; color: var(--muted); }
+
+/* 答题区 */
+.quiz-word {
+  font-size: 34px;
+  text-align: center;
+  margin: 16px 0;
+  letter-spacing: 1px;
+}
+.choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+.choice { padding: 12px; }
+.choice.good { background: var(--green); color: #fff; border-color: var(--green); }
+.choice.bad { background: #a32d2d; color: #fff; border-color: #a32d2d; }
+.choice:disabled { cursor: default; }
+.quiz-feedback { min-height: 24px; margin-top: 12px; font-size: 14px; }
+.quiz-feedback.good { color: var(--green); }
+.quiz-feedback.bad { color: #a32d2d; }
+
+/* 奖励结算 */
+.reward-box { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+.reward-box h3 { margin-top: 0; }
+.reward-box ul { margin: 8px 0; padding-left: 20px; }
+
+/* 战斗 */
+.hud {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.hud b { font-size: 16px; color: var(--green); }
+.battle-wrap { position: relative; }
+#battle-canvas {
+  width: 100%;
+  max-width: 800px;
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #e6f1fb;
+}
+#battle-over {
+  position: absolute;
+  inset: 0;
+  max-width: 800px;
+  background: rgba(246, 245, 240, 0.94);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 8px;
+  text-align: center;
+}
+#battle-over h3 { margin: 0 0 12px; }
+#battle-over .stats { min-width: 240px; }
+#battle-over.hidden { display: none; }
+
+.foot {
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  padding-bottom: 24px;
+}

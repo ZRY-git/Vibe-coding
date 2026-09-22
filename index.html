@@ -3,28 +3,103 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vibe Coding</title>
-  <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: "Microsoft YaHei", sans-serif;
-      background: #f6f5f0;
-      color: #2c2c2a;
-    }
-    main { text-align: center; }
-    h1 { font-size: 40px; margin: 0 0 12px; }
-    p { color: #888780; margin: 4px 0; }
-  </style>
+  <title>学英语变强 · PvE 爽游（本地版）</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <header class="topbar">
+    <h1>学英语变强</h1>
+    <p class="tagline">答题 → 得装备 → 打怪变强 · Day 7 MVP</p>
+  </header>
+
   <main>
-    <h1>Vibe Coding</h1>
-    <p>占位页 · 创建于 Day 2</p>
-    <p>MVP 将于 Day 7 上线</p>
+    <!-- ============ 主页 ============ -->
+    <section id="view-home" class="view active">
+      <h2>主页</h2>
+      <div class="home-grid">
+        <div class="panel">
+          <h3>角色面板</h3>
+          <ul class="stats">
+            <li>体力 <b id="stat-stamina">10</b></li>
+            <li>攻击力 <b id="stat-attack">1</b></li>
+            <li>防御 <b id="stat-defense">0</b></li>
+            <li>移动速度 <b id="stat-speed">100%</b></li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>装备栏 / 饰品栏</h3>
+          <div class="slots">
+            <div class="slot" id="slot-gloves">力量手套 ×0</div>
+            <div class="slot" id="slot-bracers">皮护腕 ×0</div>
+            <div class="slot" id="slot-pendant">workbuddy挂坠 ×0</div>
+          </div>
+          <p class="hint">获得即生效 · 只增不减</p>
+        </div>
+        <div class="panel">
+          <h3>分数</h3>
+          <ul class="stats">
+            <li>最高单局分 <b id="stat-best">0</b></li>
+            <li>本周累计分 <b id="stat-weekly">0</b></li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>称号</h3>
+          <p>当前展示：<b id="title-current">暂无</b></p>
+          <div class="row">
+            <select id="title-select"></select>
+            <input id="title-input" type="text" placeholder="自定义称号文字" maxlength="10" style="display:none">
+            <button id="title-save">设为展示</button>
+          </div>
+          <p class="hint" id="title-progress"></p>
+        </div>
+      </div>
+      <button class="primary" id="btn-start-learn">开始学习</button>
+    </section>
+
+    <!-- ============ 学习页 ============ -->
+    <section id="view-learn" class="view">
+      <h2>学习页</h2>
+      <div class="panel">
+        <h3>选择目标词组</h3>
+        <div class="slots" id="pack-list"></div>
+      </div>
+      <div class="panel" id="quiz-area"></div>
+      <button id="btn-learn-home">返回主页</button>
+    </section>
+
+    <!-- ============ 战斗页 ============ -->
+    <section id="view-battle" class="view">
+      <h2>战斗页</h2>
+      <div class="hud">
+        <span>波次 <b id="hud-wave">1</b></span>
+        <span>击杀 <b id="hud-kills">0</b></span>
+        <span>生命 <b id="hud-hp">10</b></span>
+        <span>本局分数 <b id="hud-score">0</b></span>
+      </div>
+      <div class="battle-wrap">
+        <canvas id="battle-canvas" width="800" height="360"></canvas>
+        <div id="battle-over" class="hidden">
+          <h3>本局结束（战败零损失）</h3>
+          <ul class="stats">
+            <li>本局分数 <b id="result-score">0</b></li>
+            <li>撑到第 <b id="result-wave">1</b> 波</li>
+            <li>击杀 <b id="result-kills">0</b></li>
+          </ul>
+          <div class="row">
+            <button class="primary" id="btn-retry">再来一局</button>
+            <button id="btn-battle-home">返回主页</button>
+          </div>
+        </div>
+      </div>
+      <p class="hint" id="battle-tip">操作：← → / A D 移动 · ↑ / W / 空格 跳跃 · J 攻击（怪从左右两侧进场，本期只做陆军）</p>
+    </section>
   </main>
+
+  <footer class="foot">
+    <p>本地单机版 · 数据存在浏览器里 · 无登录无后端</p>
+  </footer>
+
+  <script src="words.js"></script>
+  <script src="game.js"></script>
 </body>
 </html>
