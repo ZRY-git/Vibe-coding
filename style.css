@@ -4,6 +4,7 @@
   --card: #ffffff;
   --ink: #2c2c2a;
   --muted: #888780;
+  --muted-strong: #5f5e5a;
   --line: #d3d1c7;
   --green: #0f6e56;
   --green-soft: #e1f5ee;
@@ -209,12 +210,12 @@ select, input[type="text"] {
   gap: 4px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 14px 16px;
+  padding: 16px;
   background: var(--green-soft);
 }
-.stat-label { font-size: 13px; color: var(--muted); }
+.stat-label { font-size: 13px; color: var(--muted-strong); }
 .stat-value { font-size: 28px; color: var(--green); }
-.stat-sub { font-size: 12px; color: var(--muted); }
+.stat-sub { font-size: 12px; color: var(--muted-strong); }
 
 /* 单词列表 */
 .word-list {
@@ -230,21 +231,25 @@ select, input[type="text"] {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 16px;
   border-bottom: 1px dashed var(--line);
 }
 .word-item:last-child { border-bottom: none; }
 .word-item b { min-width: 100px; font-size: 16px; }
-.word-item > span:first-of-type { color: var(--muted); flex: 1; }
+.word-item > span:first-of-type { font-size: 14px; color: var(--muted-strong); flex: 1; }
 .word-tag {
   font-size: 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 2px 10px;
-  color: var(--muted);
+  color: var(--muted-strong);
   background: var(--bg);
 }
 .word-status { font-size: 12px; padding: 2px 10px; border-radius: 999px; }
 .word-status.done { background: var(--green); color: #fff; }
 .word-status.doing { background: #f0c95c; color: #5c4a12; }
 .word-status.todo { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+
+/* 主页专属修复（Day 9）：提示文字与列表内容对齐、间距统一 */
+.page-home .hint { margin: 16px 0 0; padding-left: 16px; }
+.page-home .foot { color: var(--muted-strong); }
