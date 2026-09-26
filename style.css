@@ -192,3 +192,59 @@ select, input[type="text"] {
   font-size: 12px;
   padding-bottom: 24px;
 }
+
+/* ===== 主页（Day 8 新增） ===== */
+.tagline a { color: var(--green); }
+
+/* 统计卡片 */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: var(--green-soft);
+}
+.stat-label { font-size: 13px; color: var(--muted); }
+.stat-value { font-size: 28px; color: var(--green); }
+.stat-sub { font-size: 12px; color: var(--muted); }
+
+/* 单词列表 */
+.word-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.word-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px dashed var(--line);
+}
+.word-item:last-child { border-bottom: none; }
+.word-item b { min-width: 100px; font-size: 16px; }
+.word-item > span:first-of-type { color: var(--muted); flex: 1; }
+.word-tag {
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 10px;
+  color: var(--muted);
+  background: var(--bg);
+}
+.word-status { font-size: 12px; padding: 2px 10px; border-radius: 999px; }
+.word-status.done { background: var(--green); color: #fff; }
+.word-status.doing { background: #f0c95c; color: #5c4a12; }
+.word-status.todo { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学英语变强 · 主页</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>学英语变强</h1>
+    <p class="tagline">主页 · 本周学习概览（mock 数据版）· <a href="index.html">进入游戏版</a></p>
+  </header>
+
+  <main>
+    <section class="view active">
+      <h2>本周学习统计</h2>
+      <!-- 统计卡片：由 main.js 从 mock-data.js 读取渲染 -->
+      <div class="stat-grid" id="stat-grid"></div>
+
+      <h2>单词列表</h2>
+      <!-- 单词列表：由 main.js 从 mock-data.js 读取渲染 -->
+      <ul class="word-list" id="word-list"></ul>
+      <p class="hint">以上为本地假数据（mock，来自 mock-data.js），第 3 周才接真实 API。</p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>主页 · Day 8 · 数据来自本地 mock-data.js 渲染</p>
+  </footer>
+
+  <script src="mock-data.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
