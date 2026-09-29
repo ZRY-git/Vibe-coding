@@ -32,7 +32,8 @@ function loadState() {
   const base = {
     stamina: 10, weapon: 0, pendants: 0,
     bestScore: 0, weeklyScore: 0, weekKey: "",
-    unlockedTitles: [], chosenTitle: ""
+    unlockedTitles: [], chosenTitle: "",
+    character: "m"   // 我的角色：m = Henry（男），f = Rena（女）
   };
   const state = Object.assign(base, saved || {});
   const thisWeek = mondayOf(new Date());
@@ -73,12 +74,52 @@ function checkTitles() {
   });
 }
 
+// ============ 角色精灵（待机 / 行走 sprite sheet，帧等宽横排） ============
+const CHAR_META = {
+  m: { name: "Henry", idle: { src: "assets/char-m-idle.png", frames: 2 }, walk: { src: "assets/char-m-walk.png", frames: 4 } },
+  f: { name: "Rena",  idle: { src: "assets/char-f-idle.png", frames: 2 }, walk: { src: "assets/char-f-walk.png", frames: 4 } }
+};
+Object.values(CHAR_META).forEach(c => {
+  [c.idle, c.walk].forEach(s => { s.img = new Image(); s.img.src = s.src; });
+});
+const curChar = () => CHAR_META[state.character] || CHAR_META.m;
+
+// 主页「我的角色」待机预览：仅主页显示时运行
+let charPrev = { raf: 0, t: 0, last: 0 };
+function startCharPreview() {
+  stopCharPreview();
+  const c = $("#char-canvas");
+  if (!c) return;
+  const cctx = c.getContext("2d");
+  charPrev.last = performance.now();
+  const loop = (now) => {
+    charPrev.t += (now - charPrev.last) / 1000;
+    charPrev.last = now;
+    const s = curChar().idle;
+    cctx.clearRect(0, 0, c.width, c.height);
+    if (s.img.complete && s.img.naturalWidth) {
+      const fw = s.img.naturalWidth / s.frames, fh = s.img.naturalHeight;
+      const fi = Math.floor(charPrev.t / 0.7) % s.frames;   // 0.7s 换一帧
+      const H = c.height - 4, W = H * fw / fh;
+      cctx.imageSmoothingEnabled = false;
+      cctx.drawImage(s.img, fi * fw, 0, fw, fh, (c.width - W) / 2, c.height - H, W, H);
+    }
+    charPrev.raf = requestAnimationFrame(loop);
+  };
+  charPrev.raf = requestAnimationFrame(loop);
+}
+function stopCharPreview() {
+  if (charPrev.raf) cancelAnimationFrame(charPrev.raf);
+  charPrev.raf = 0;
+}
+
 // ============ 视图切换 ============
 function showView(id) {
   $$(".view").forEach(v => v.classList.toggle("active", v.id === id));
   if (id === "view-battle") startBattle();
   else stopBattle();
-  if (id === "view-home") renderHome();
+  if (id === "view-home") { renderHome(); startCharPreview(); }
+  else stopCharPreview();
   if (id === "view-learn") renderPacks();
   window.scrollTo(0, 0);
 }
@@ -89,6 +130,8 @@ function renderHome() {
   $("#stat-attack").textContent = attackPower();
   $("#stat-defense").textContent = defensePower();
   $("#stat-speed").textContent = speedPct() + "%";
+  $$(".char-choice").forEach(b => b.classList.toggle("active", b.dataset.char === state.character));
+  $("#char-name").textContent = `当前：${curChar().name}`;
   const rowWeapon = $("#slot-weapon");
   $("#weapon-count").textContent = `血染荒城 ×${state.weapon}`;
   rowWeapon.classList.toggle("owned", state.weapon > 0);
@@ -223,13 +266,14 @@ const ctx = cv.getContext("2d");
 const weaponImg = new Image();
 weaponImg.src = "assets/血染荒城-hand.png";
 
-// 把武器画在玩家手上：枪杆截半后，剩余部分放大 3 倍（≈74px 高），握点仍在手部
+// 把武器画在玩家手上：尺寸随人物放大（人物 128px，武器 ≈148px，保持原有人枪比例），握点 = 切断的杆口
 function drawWeapon(p) {
   if (state.weapon < 1 || !weaponImg.complete || !weaponImg.naturalWidth) return;
-  const H = 74, W = H * weaponImg.naturalWidth / weaponImg.naturalHeight;
-  const gripX = W * 0.50, gripY = H * 0.98;   // 握持点 = 切断的杆口（图中底部中间）
+  const H = 148, W = H * weaponImg.naturalWidth / weaponImg.naturalHeight;
+  const gripX = W * 0.50, gripY = H * 0.98;
   ctx.save();
-  ctx.translate(p.x + p.w / 2 + p.face * 12, p.y + p.h * 0.62);   // 手的位置
+  // 手的位置：精灵脚踩 p.y+p.h、高 128px，手部约在脚底上方 50px、身体中线略前
+  ctx.translate(p.x + p.w / 2 + p.face * 8, p.y + p.h - 50);
   ctx.scale(p.face, 1);                       // 朝向翻转
   const base = 77.5 * Math.PI / 180;          // 平时 45° 斜握（枪头指向前上方 45°）
   let ang;
@@ -255,7 +299,8 @@ function createBattle() {
     player: {
       x: CVW / 2 - 14, y: GROUND - 44, w: 28, h: 44,
       vy: 0, hp: 10, face: 1, cd: 0, swing: 0, inv: 0, onGround: true,
-      slamming: false, swingHits: new Set()   // swingHits：本次挥砍已命中的敌人
+      slamming: false, swingHits: new Set(),   // swingHits：本次挥砍已命中的敌人
+      moving: false, animT: 0                  // 动画：是否在走 / 动画累计时间
     },
     monsters: [], toSpawn: 5, spawnTimer: 0.5, betweenTimer: 0,
     shockwaves: [], shockTimer: 0, slamX: 0, mobId: 0,
@@ -313,8 +358,12 @@ function update(k, dt) {
   const b = battle, p = b.player;
   // 左右移动（移速由体力换算）
   const sp = moveSpeed();
-  if (b.keys["ArrowLeft"] || b.keys["a"] || b.keys["A"]) { p.x -= sp * k; p.face = -1; }
-  if (b.keys["ArrowRight"] || b.keys["d"] || b.keys["D"]) { p.x += sp * k; p.face = 1; }
+  const goL = b.keys["ArrowLeft"] || b.keys["a"] || b.keys["A"];
+  const goR = b.keys["ArrowRight"] || b.keys["d"] || b.keys["D"];
+  if (goL) { p.x -= sp * k; p.face = -1; }
+  if (goR) { p.x += sp * k; p.face = 1; }
+  p.moving = !!(goL || goR);
+  p.animT += dt / 1000;
   p.x = Math.max(0, Math.min(CVW - p.w, p.x));
   // 跳跃（重力）
   if (p.onGround && (b.keys["ArrowUp"] || b.keys[" "] || b.keys["w"] || b.keys["W"])) {
@@ -481,23 +530,40 @@ function draw() {
   ctx.fillStyle = "#3b6d11";                       // 草皮线
   ctx.fillRect(0, GROUND, CVW, 4);
 
-  // 玩家：绿色小方块（呼应 WorkBuddy 猫的绿）
+  // 玩家：所选角色精灵（待机 2 帧循环 / 行走 4 帧循环 / 空中定格跨步帧）
   const blink = p.inv > 0 && Math.floor(p.inv * 10) % 2 === 0;
   ctx.globalAlpha = blink ? 0.35 : 1;
-  ctx.fillStyle = "#0f6e56";
-  ctx.fillRect(p.x, p.y, p.w, p.h);
-  ctx.fillStyle = "#ffffff";
-  const eyeX = p.face > 0 ? p.x + p.w - 10 : p.x + 4;
-  ctx.fillRect(eyeX, p.y + 8, 6, 6);
+  const ch = curChar();
+  let sheet, fi;
+  if (!p.onGround) { sheet = ch.walk; fi = 1; }                       // 跳跃/下落：跨步定格
+  else if (p.moving) { sheet = ch.walk; fi = Math.floor(p.animT / 0.12) % sheet.frames; }
+  else { sheet = ch.idle; fi = Math.floor(p.animT / 0.7) % sheet.frames; }
+  if (sheet.img.complete && sheet.img.naturalWidth) {
+    const fw = sheet.img.naturalWidth / sheet.frames, fh = sheet.img.naturalHeight;
+    const H = 128, W = H * fw / fh;           // 精灵 128px 高（碰撞盒仍是 28×44，脚踩盒底）
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.translate(p.x + p.w / 2, p.y + p.h);
+    ctx.scale(p.face, 1);                     // 朝左时水平翻转
+    ctx.drawImage(sheet.img, fi * fw, 0, fw, fh, -W / 2, -H, W, H);
+    ctx.restore();
+  } else {
+    // 素材未加载完：回退绿色小方块（呼应 WorkBuddy 猫的绿）
+    ctx.fillStyle = "#0f6e56";
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.fillStyle = "#ffffff";
+    const eyeX = p.face > 0 ? p.x + p.w - 10 : p.x + 4;
+    ctx.fillRect(eyeX, p.y + 8, 6, 6);
+  }
   ctx.globalAlpha = 1;
   drawWeapon(p);   // 血染荒城挂在手上
-  // 刀光
+  // 刀光（中心对齐手部高度）
   if (p.swing > 0) {
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 3;
     ctx.beginPath();
     const cx = p.face > 0 ? p.x + p.w + 26 : p.x - 26;
-    ctx.arc(cx, p.y + p.h / 2, 22, -1.1, 1.1);
+    ctx.arc(cx, p.y + p.h - 50, 22, -1.1, 1.1);
     ctx.stroke();
   }
   // 怪物：珊瑚色方块
@@ -567,7 +633,14 @@ window.addEventListener("keyup", e => {
 document.addEventListener("DOMContentLoaded", () => {
   renderHome();
   renderPacks();
+  startCharPreview();   // 首屏即主页，直接开播待机动画
+  $$(".char-choice").forEach(btn => btn.addEventListener("click", () => {
+    state.character = btn.dataset.char;
+    saveAll();
+    renderHome();       // 高亮与「当前：」立即更新，预览循环自己切到新角色
+  }));
   $("#btn-start-learn").addEventListener("click", () => showView("view-learn"));
+  $("#btn-start-battle").addEventListener("click", () => showView("view-battle"));  // Day 10：主页直接开战（跳过学习）
   $("#btn-learn-home").addEventListener("click", () => showView("view-home"));
   $("#btn-retry").addEventListener("click", () => startBattle());
   $("#btn-battle-home").addEventListener("click", () => showView("view-home"));

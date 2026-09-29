@@ -6,7 +6,7 @@
   <title>学英语变强 · PvE 爽游（本地版）</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="page-game">
   <header class="topbar">
     <h1>学英语变强</h1>
     <p class="tagline">答题 → 得装备 → 打怪变强 · Day 7 MVP</p>
@@ -16,15 +16,43 @@
     <!-- ============ 主页 ============ -->
     <section id="view-home" class="view active">
       <h2>主页</h2>
-      <div class="home-grid">
-        <div class="panel">
-          <h3>角色面板</h3>
-          <ul class="stats">
-            <li>体力 <b id="stat-stamina">10</b></li>
-            <li>攻击力 <b id="stat-attack">1</b></li>
-            <li>防御 <b id="stat-defense">0</b></li>
-            <li>移动速度 <b id="stat-speed">100%</b></li>
-          </ul>
+      <div class="home-layout">
+        <div class="home-left">
+          <div class="panel panel-character">
+            <h3>我的角色</h3>
+            <canvas id="char-canvas" width="108" height="128"></canvas>
+            <div class="char-select">
+              <button class="char-choice" data-char="m" title="Henry"><img src="assets/char-m-thumb.png" alt="男角色 Henry"></button>
+              <button class="char-choice" data-char="f" title="Rena"><img src="assets/char-f-thumb.png" alt="女角色 Rena"></button>
+            </div>
+            <p class="hint" id="char-name">当前：Henry</p>
+          </div>
+          <div class="panel">
+            <h3>角色面板</h3>
+            <ul class="stats">
+              <li>体力 <b id="stat-stamina">10</b></li>
+              <li>攻击力 <b id="stat-attack">1</b></li>
+              <li>防御 <b id="stat-defense">0</b></li>
+              <li>移动速度 <b id="stat-speed">100%</b></li>
+            </ul>
+          </div>
+          <div class="panel">
+            <h3>分数</h3>
+            <ul class="stats">
+              <li>最高单局分 <b id="stat-best">0</b></li>
+              <li>本周累计分 <b id="stat-weekly">0</b></li>
+            </ul>
+          </div>
+          <div class="panel">
+            <h3>称号</h3>
+            <p>当前展示：<b id="title-current">暂无</b></p>
+            <div class="row">
+              <select id="title-select"></select>
+              <input id="title-input" type="text" placeholder="自定义称号文字" maxlength="10" style="display:none">
+              <button id="title-save">设为展示</button>
+            </div>
+            <p class="hint" id="title-progress"></p>
+          </div>
         </div>
         <div class="panel panel-equip">
           <h3>装备栏</h3>
@@ -63,25 +91,11 @@
           </div>
           <p class="hint">获得即生效 · 只增不减 · workbuddy吊坠：分数获得效率 +20%</p>
         </div>
-        <div class="panel">
-          <h3>分数</h3>
-          <ul class="stats">
-            <li>最高单局分 <b id="stat-best">0</b></li>
-            <li>本周累计分 <b id="stat-weekly">0</b></li>
-          </ul>
-        </div>
-        <div class="panel">
-          <h3>称号</h3>
-          <p>当前展示：<b id="title-current">暂无</b></p>
-          <div class="row">
-            <select id="title-select"></select>
-            <input id="title-input" type="text" placeholder="自定义称号文字" maxlength="10" style="display:none">
-            <button id="title-save">设为展示</button>
-          </div>
-          <p class="hint" id="title-progress"></p>
-        </div>
       </div>
-      <button class="primary" id="btn-start-learn">开始学习</button>
+      <div class="row">
+        <button class="primary" id="btn-start-learn">开始学习</button>
+        <button class="primary" id="btn-start-battle">开始游戏</button>
+      </div>
     </section>
 
     <!-- ============ 学习页 ============ -->

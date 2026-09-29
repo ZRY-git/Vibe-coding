@@ -12,6 +12,16 @@
 
 * { box-sizing: border-box; }
 
+/* 游戏版背景（Day 10）：向日葵花海像素图铺满页面，内容仍由白色卡片承载 */
+body.page-game {
+  background-color: var(--bg);
+  background-image: url("assets/向日葵花海.png");
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: cover;
+  background-attachment: fixed;
+}
+
 body {
   margin: 0;
   font-family: "Microsoft YaHei", sans-serif;
@@ -45,11 +55,55 @@ main { padding: 8px 32px 32px; }
   padding-left: 10px;
 }
 
-.home-grid {
+/* 主页布局（Day 10）：左侧 2×2 信息卡，右侧装备/饰品栏通栏拉高 */
+.home-layout {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 16px;
+  align-items: stretch;
   margin-bottom: 16px;
+}
+.home-left {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-content: start;
+}
+/* 我的角色：待机展示 + 男/女选择 */
+.panel-character { text-align: center; }
+#char-canvas {
+  width: 108px;
+  height: 128px;
+  image-rendering: pixelated;
+}
+.char-select {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 6px;
+}
+.char-choice {
+  padding: 4px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+}
+.char-choice img {
+  display: block;
+  width: 48px;
+  height: 48px;
+  image-rendering: pixelated;
+}
+.char-choice.active {
+  border-color: #ffd94a;
+  background: rgba(255, 217, 74, 0.18);
+}
+@media (max-width: 900px) {
+  .home-layout { grid-template-columns: 1fr; }  /* 窄屏：装备栏换到信息卡下方 */
+}
+@media (max-width: 560px) {
+  .home-left { grid-template-columns: 1fr; }    /* 手机：信息卡单列 */
 }
 
 .panel {
@@ -59,6 +113,23 @@ main { padding: 8px 32px 32px; }
   background: var(--green-soft);
 }
 .panel h3 { margin: 0 0 10px; font-size: 15px; }
+
+/* ===== 主页面板（Day 10）：泰拉瑞亚金色成就边框 + 木墙背景 ===== */
+.page-game #view-home .panel {
+  border: 12px solid transparent;                       /* 边框厚度 = 素材 6px 切片的 2 倍放大 */
+  border-image-source: url("assets/achievement-border.png");
+  border-image-slice: 6;                                /* 素材边框实际厚度 6px */
+  border-image-repeat: stretch;
+  background-color: #241610;                            /* 砖缝垫底色 */
+  background-image: url("assets/wood-wall.png");
+  background-repeat: repeat;
+  background-size: 128px 128px;                         /* 64px 瓷砖的 2 倍整数放大，保持像素感 */
+  image-rendering: pixelated;
+  color: #f5ecd8;                                       /* 深木底上改浅色文字保证可读 */
+}
+.page-game #view-home .panel .stats li { border-bottom-color: rgba(245, 236, 216, 0.25); }
+.page-game #view-home .panel .equip-label,
+.page-game #view-home .panel .hint { color: #f5ecd8; }
 
 .stats { list-style: none; margin: 0 0 10px; padding: 0; }
 .stats li {
@@ -74,30 +145,8 @@ main { padding: 8px 32px 32px; }
   flex-wrap: wrap;
   gap: 8px;
 }
-.slot {
-  border: 1.5px dashed var(--muted);
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 13px;
-  color: var(--muted);
-  background: #fff;
-}
-.slot-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--ink);
-}
-.slot-item img {
-  width: 28px;
-  height: 28px;
-  image-rendering: pixelated;
-  flex: none;
-}
-.slot-item.empty img { opacity: 0.25; filter: grayscale(1); }
 
 /* ===== 装备栏 / 饰品栏（手绘稿结构：标签 + 整行框内 图标方块 + 名称） ===== */
-.panel-equip { grid-column: 1 / -1; } /* 独占一行，不与其他三个面板对齐 */
 .equip-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .equip-label { flex: none; font-size: 13px; color: var(--ink); min-width: 3.2em; text-align: right; }
 .equip-box {
@@ -105,7 +154,7 @@ main { padding: 8px 32px 32px; }
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 46px;
+  min-height: 56px;
   padding: 6px 10px;
   border: 1.5px solid var(--line);
   border-radius: 8px;
@@ -113,8 +162,8 @@ main { padding: 8px 32px 32px; }
 }
 .equip-icon {
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
   border: 1.5px dashed var(--muted);
   border-radius: 6px;
   display: inline-flex;
