@@ -30,7 +30,7 @@ function loadState() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { saved = null; }
   const base = {
-    stamina: 10, gloves: 0, bracers: 0, pendants: 0,
+    stamina: 10, weapon: 0, pendants: 0,
     bestScore: 0, weeklyScore: 0, weekKey: "",
     unlockedTitles: [], chosenTitle: ""
   };
@@ -44,6 +44,8 @@ function loadState() {
 }
 
 const state = loadState();
+// workbuddy 吊坠保底发放：确保存档里至少有 1 个（验收条件：发放并装在饰品栏）
+if (state.pendants < 1) { state.pendants = 1; saveAll(); }
 let runs = [];
 try { runs = JSON.parse(localStorage.getItem(RUNS_KEY)) || []; } catch (e) { runs = []; }
 
@@ -53,8 +55,8 @@ function saveAll() {
 }
 
 // ============ 派生属性（面板 4 项） ============
-const attackPower = () => 1 + state.gloves;                        // 力量手套 +1
-const defensePower = () => state.bracers;                          // 皮护腕 +1
+const attackPower = () => 1 + state.weapon;                        // 血染荒城 +1
+const defensePower = () => 0;                                      // 暂无防具来源
 const speedPct = () => 100 + 5 * Math.floor(state.stamina / 10);   // 每 10 点体力 +5%
 const moveSpeed = () => 2.6 * (speedPct() / 100);                  // 战斗内实际移速
 
@@ -87,9 +89,13 @@ function renderHome() {
   $("#stat-attack").textContent = attackPower();
   $("#stat-defense").textContent = defensePower();
   $("#stat-speed").textContent = speedPct() + "%";
-  $("#slot-gloves").textContent = `力量手套 ×${state.gloves}`;
-  $("#slot-bracers").textContent = `皮护腕 ×${state.bracers}`;
-  $("#slot-pendant").textContent = `workbuddy挂坠 ×${state.pendants}`;
+  const rowWeapon = $("#slot-weapon");
+  $("#weapon-count").textContent = `血染荒城 ×${state.weapon}`;
+  rowWeapon.classList.toggle("owned", state.weapon > 0);
+  const slotPendant = $("#slot-pendant");
+  $("#pendant-count").textContent = `workbuddy挂坠 ×${state.pendants}`;
+  slotPendant.classList.toggle("owned", state.pendants > 0);
+  slotPendant.classList.toggle("empty", state.pendants === 0);
   $("#stat-best").textContent = state.bestScore;
   $("#stat-weekly").textContent = state.weeklyScore;
   $("#title-current").textContent = state.chosenTitle || "暂无";
@@ -186,8 +192,7 @@ function answer(picked, cur, wrap, btn) {
 
 function finishLearning() {
   state.stamina += 5;
-  state.gloves++;
-  state.bracers++;
+  state.weapon++;
   state.pendants++;
   saveAll();
   renderHome(); // 主页数据同步（面板立即可见，A2/A4）
@@ -196,9 +201,8 @@ function finishLearning() {
       <h3>本组学习完成，奖励到账！</h3>
       <ul>
         <li>体力 +5（现 ${state.stamina}）</li>
-        <li>力量手套 +1（攻击力 ${attackPower()}）</li>
-        <li>皮护腕 +1（防御 ${defensePower()}）</li>
-        <li>workbuddy挂坠 +1（收藏中，本期无数值）</li>
+        <li>血染荒城 +1（攻击力 ${attackPower()}）</li>
+        <li>workbuddy挂坠 +1（分数获得效率 +20%）</li>
       </ul>
       <p class="hint">移动速度现为 ${speedPct()}%，只增不减。</p>
       <div class="row">
@@ -215,7 +219,34 @@ function finishLearning() {
 // ============ 战斗页（2D 横版 · 陆军 · 无尽波次） ============
 const cv = $("#battle-canvas");
 const ctx = cv.getContext("2d");
-const CVW = 800, CVH = 360, GROUND = 310, GRAV = 0.55, JUMP = -11;
+// 血染荒城手持图（已抠透明背景）
+const weaponImg = new Image();
+weaponImg.src = "assets/血染荒城-hand.png";
+
+// 把武器画在玩家手上：枪杆截半后，剩余部分放大 3 倍（≈74px 高），握点仍在手部
+function drawWeapon(p) {
+  if (state.weapon < 1 || !weaponImg.complete || !weaponImg.naturalWidth) return;
+  const H = 74, W = H * weaponImg.naturalWidth / weaponImg.naturalHeight;
+  const gripX = W * 0.50, gripY = H * 0.98;   // 握持点 = 切断的杆口（图中底部中间）
+  ctx.save();
+  ctx.translate(p.x + p.w / 2 + p.face * 12, p.y + p.h * 0.62);   // 手的位置
+  ctx.scale(p.face, 1);                       // 朝向翻转
+  const base = 77.5 * Math.PI / 180;          // 平时 45° 斜握（枪头指向前上方 45°）
+  let ang;
+  if (p.slamming) ang = base + 135 * Math.PI / 180;   // 快速下砸时：枪头朝正下（-90°）
+  else if (p.swing > 0) ang = (32.5 + (1 - p.swing / SWING_TIME) * 90) * Math.PI / 180;   // 挥砍：枪头从 90°(上) 抡到 0°(前)
+  else ang = base;
+  ctx.rotate(ang);
+  ctx.drawImage(weaponImg, -gripX, -gripY, W, H);
+  ctx.restore();
+}
+const CVW = 1200, CVH = 600, GROUND = 550, GRAV = 0.55, JUMP = -11;
+// 血染荒城技能参数（下砸 500px/s，冲击波传播 300px/s，换算成每帧 px）
+const SLAM_FALL = 500 / 60;          // 空中按 J 快速下砸
+const SHOCK_SPEED = 300 / 60;        // 闪电冲击波向左右传播
+const SHOCK_DMG = 10;                // 冲击波伤害
+const SWING_TIME = 0.25;             // 挥砍动画时长（秒）
+const SWING_CD = 0.1;                // 挥砍完成后的冷却（秒）
 let battle = null;
 
 function createBattle() {
@@ -223,9 +254,11 @@ function createBattle() {
     wave: 1, kills: 0, over: false, raf: 0, last: performance.now(),
     player: {
       x: CVW / 2 - 14, y: GROUND - 44, w: 28, h: 44,
-      vy: 0, hp: 10, face: 1, cd: 0, swing: 0, inv: 0, onGround: true
+      vy: 0, hp: 10, face: 1, cd: 0, swing: 0, inv: 0, onGround: true,
+      slamming: false, swingHits: new Set()   // swingHits：本次挥砍已命中的敌人
     },
     monsters: [], toSpawn: 5, spawnTimer: 0.5, betweenTimer: 0,
+    shockwaves: [], shockTimer: 0, slamX: 0, mobId: 0,
     keys: {}
   };
 }
@@ -234,10 +267,16 @@ function waveHp(w) { return 2 + Math.floor(w / 2); }       // 波次越深越厚
 function waveSpeed(w) { return Math.min(2.2, 0.8 + w * 0.15); }
 function waveDmg(w) { return 1 + Math.floor(w / 3); }
 
+// 血染荒城：在落地点生成一道闪电冲击波（第一道传 50px 消失，第二道传 100px 消失）
+function spawnShock(b, tier) {
+  b.shockwaves.push({ x: b.slamX, d: 0, maxD: tier === 1 ? 50 : 100, tier, hits: new Set() });
+}
+
 function spawnMonster(b) {
   const fromLeft = Math.random() < 0.5;
   const w = 30, h = 26;
   b.monsters.push({
+    id: b.mobId++,
     x: fromLeft ? -w - 4 : CVW + 4, y: GROUND - h, w, h,
     vx: fromLeft ? waveSpeed(b.wave) : -waveSpeed(b.wave),
     hp: waveHp(b.wave), maxHp: waveHp(b.wave), dmg: waveDmg(b.wave)
@@ -281,23 +320,39 @@ function update(k, dt) {
   if (p.onGround && (b.keys["ArrowUp"] || b.keys[" "] || b.keys["w"] || b.keys["W"])) {
     p.vy = JUMP; p.onGround = false;
   }
-  p.vy += GRAV * k;
+  // 血染荒城：空中按 J → 以 100px/s 恒定速度快速下砸（需持有武器）
+  if ((b.keys["j"] || b.keys["J"]) && !p.onGround && !p.slamming && state.weapon > 0) p.slamming = true;
+  if (p.slamming) { p.vy = SLAM_FALL; }   // 下砸期间不受重力，匀速下落
+  else p.vy += GRAV * k;
   p.y += p.vy * k;
-  if (p.y >= GROUND - p.h) { p.y = GROUND - p.h; p.vy = 0; p.onGround = true; }
-  // 攻击（J）：面前短距离，冷却 0.35s
+  if (p.y >= GROUND - p.h) {
+    p.y = GROUND - p.h; p.vy = 0; p.onGround = true;
+    if (p.slamming) {   // 下砸落地：第一道冲击波，100ms 后第二道
+      p.slamming = false;
+      b.slamX = p.x + p.w / 2;
+      spawnShock(b, 1);
+      b.shockTimer = 0.1;
+    }
+  }
+  // 攻击（J）：面前短距离；挥砍 0.25s + 冷却 0.1s
   p.cd = Math.max(0, p.cd - dt / 1000);
   p.swing = Math.max(0, p.swing - dt / 1000);
   p.inv = Math.max(0, p.inv - dt / 1000);
-  if (b.keys["j"] || b.keys["J"]) {
+  if ((b.keys["j"] || b.keys["J"]) && !p.slamming) {
     if (p.cd <= 0) {
-      p.cd = 0.35; p.swing = 0.15;
-      const x1 = p.face > 0 ? p.x + p.w : p.x - 60;
-      b.monsters.forEach(m => {
-        const overlapY = m.y + m.h > p.y && m.y < p.y + p.h;
-        const overlapX = m.x < x1 + 60 && m.x + m.w > x1;
-        if (overlapY && overlapX) m.hp -= attackPower();
-      });
+      p.cd = SWING_TIME + SWING_CD; p.swing = SWING_TIME;
+      p.swingHits = new Set();
     }
+  }
+  // 剑气伤害：白弧（剑气）出现的挥砍期间才判定，每只怪每次挥砍只中一次
+  if (p.swing > 0) {
+    const x1 = p.face > 0 ? p.x + p.w : p.x - 60;
+    b.monsters.forEach(m => {
+      if (p.swingHits.has(m.id)) return;
+      const overlapY = m.y + m.h > p.y && m.y < p.y + p.h;
+      const overlapX = m.x < x1 + 60 && m.x + m.w > x1;
+      if (overlapY && overlapX) { m.hp -= attackPower(); p.swingHits.add(m.id); }
+    });
   }
   // 刷怪：每波 5 只，只从左右进场（A7）
   if (b.toSpawn > 0) {
@@ -323,6 +378,24 @@ function update(k, dt) {
     }
     return true;
   });
+  // 血染荒城：第二道冲击波在落地 100ms 后从落地点生成
+  if (b.shockTimer > 0) {
+    b.shockTimer -= dt / 1000;
+    if (b.shockTimer <= 0) spawnShock(b, 2);
+  }
+  // 闪电冲击波：以 100px/s 向左右同时传播，贴地命中敌人造成 10 点伤害（每只怪每道波只中一次）
+  b.shockwaves.forEach(s => {
+    s.d += SHOCK_SPEED * k;
+    const lx = s.x - s.d, rx = s.x + s.d;
+    b.monsters.forEach(m => {
+      if (s.hits.has(m.id)) return;
+      const nearGround = m.y + m.h > GROUND - 40;
+      const hitL = lx > m.x - 6 && lx < m.x + m.w + 6;
+      const hitR = rx > m.x - 6 && rx < m.x + m.w + 6;
+      if (nearGround && (hitL || hitR)) { m.hp -= SHOCK_DMG; s.hits.add(m.id); }
+    });
+  });
+  b.shockwaves = b.shockwaves.filter(s => s.d < s.maxD);
   if (p.hp <= 0) { b.over = true; }   // 战败：本局结束，资产零损失（A9）
 }
 
@@ -332,6 +405,70 @@ function updateHud() {
   $("#hud-kills").textContent = battle.kills;
   $("#hud-score").textContent = battle.kills;
   $("#hud-hp").textContent = Math.max(0, battle.player.hp);
+}
+
+// 血染荒城：像素画闪电（24 列 × 28 行，1 格 = 2px → 宽 48px × 高 56px，即旧版宽×3 高×2）
+// B=暗蓝主体 H=亮蓝高光 Y=亮黄点缀（仅第二道显示，第一道降级为主体色）
+const BOLT_SPRITE = [
+  "........HBBBBBBBB.......",
+  ".......HBBBBBBBBBB......",
+  "......HBBBBBBBBBBBB.....",
+  "......HBBBBBBBBBBBB.....",
+  ".....HBBBBBBBBBBBBB.....",
+  ".....HBBBBBYBBBBBB......",
+  ".....HBBBBBBB...........",
+  "....HBBBBBBBB...........",
+  "....HBBBBBBB............",
+  "...HBBBBBBBBB...........",
+  "...HBBBBBBBBBB..........",
+  "..HBBBBBBB..............",
+  "..HBBBBBB...............",
+  ".HBBBBBBBB..............",
+  ".HBBBBBBBBB.............",
+  ".HBBBBBBBBBBBB..........",
+  "..HBBBBBBBBBBBBB........",
+  "..HBBBBBBBBBBBBBBB......",
+  "...HBBBBBBBBBBBBYBB.....",
+  "...HBBBBBBBBBBBBBBB.....",
+  "....HBBBBBBBBBBB........",
+  ".....HBBBYBBBBB.........",
+  ".....HBBBBBBB...........",
+  "......HBBBBB............",
+  "......HBBBB.............",
+  ".......HBBB.............",
+  ".......HBB..............",
+  "........HB..............",
+];
+const BOLT_CELL = 2;
+const BOLT_COLORS = { B: "#1d3073", H: "#7ea6ff", Y: "#ffd94a" };
+function drawBolt(fx, tier, s) {
+  const u = BOLT_CELL, rows = BOLT_SPRITE.length, cols = BOLT_SPRITE[0].length;
+  const x0 = fx - (cols * u) / 2, y0 = GROUND - rows * u + 2;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const ch = BOLT_SPRITE[r][c];
+      if (ch === ".") continue;
+      ctx.fillStyle = (ch === "Y" && tier === 1) ? BOLT_COLORS.B : BOLT_COLORS[ch];
+      ctx.fillRect(x0 + c * u, y0 + r * u, u, u);
+    }
+  }
+  // 落地冲击面：闪电柱根部的横向溅射像素
+  ctx.fillStyle = BOLT_COLORS.B;
+  ctx.fillRect(fx - 12, GROUND + 2, 24, 2);
+  ctx.fillStyle = tier === 2 ? BOLT_COLORS.Y : BOLT_COLORS.H;
+  ctx.fillRect(fx - 10, GROUND + 4, 5, 2);
+  ctx.fillRect(fx + 5, GROUND + 6, 4, 2);
+  // 传播轨迹上的能量残渣（左右对称、逐段错落）
+  if (s && s.d > 10) {
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = tier === 2 ? BOLT_COLORS.Y : BOLT_COLORS.H;
+    for (let d = 8; d < s.d - 4; d += 10) {
+      const py = GROUND + 4 + (Math.floor(d / 10) % 2) * 3;
+      ctx.fillRect(s.x - d, py, 2, 2);
+      ctx.fillRect(s.x + d, py, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+  }
 }
 
 function draw() {
@@ -353,6 +490,7 @@ function draw() {
   const eyeX = p.face > 0 ? p.x + p.w - 10 : p.x + 4;
   ctx.fillRect(eyeX, p.y + 8, 6, 6);
   ctx.globalAlpha = 1;
+  drawWeapon(p);   // 血染荒城挂在手上
   // 刀光
   if (p.swing > 0) {
     ctx.strokeStyle = "#ffffff";
@@ -375,6 +513,10 @@ function draw() {
     ctx.fillStyle = "#3b6d11";
     ctx.fillRect(m.x, m.y - 8, m.w * Math.max(0, m.hp / m.maxHp), 3);
   });
+  // 血染荒城：闪电冲击波（左右两侧各一根像素闪电柱 + 轨迹残渣）
+  b.shockwaves.forEach(s => {
+    [-1, 1].forEach(dir => drawBolt(s.x + dir * s.d, s.tier, s));
+  });
   // 波间提示
   if (b.toSpawn === 0 && b.monsters.length === 0 && !b.over) {
     ctx.fillStyle = "#2c2c2a";
@@ -387,17 +529,23 @@ function draw() {
 
 function showBattleOver() {
   const b = battle;
+  // workbuddy 吊坠加成：拥有 ≥1 个即生效，入账分 = 击杀数 × 1.2（四舍五入）
+  const base = b.kills;
+  const bonus = state.pendants > 0 ? Math.round(base * 0.2) : 0;
+  const final = base + bonus;
   // 写入记录（A10）：最高分、本周累计、称号解锁；战败零损失
-  state.bestScore = Math.max(state.bestScore, b.kills);
-  state.weeklyScore += b.kills;
+  state.bestScore = Math.max(state.bestScore, final);
+  state.weeklyScore += final;
   checkTitles();
   runs.push({
-    score: b.kills, wave: b.wave, kills: b.kills,
+    score: final, wave: b.wave, kills: b.kills,
     date: new Date().toISOString().slice(0, 10)
   });
   saveAll();
   $("#battle-tip").style.display = "none";
-  $("#result-score").textContent = b.kills;
+  $("#result-score").textContent = base;
+  $("#result-bonus").textContent = `+${bonus}`;
+  $("#result-final").textContent = final;
   $("#result-wave").textContent = b.wave;
   $("#result-kills").textContent = b.kills;
   $("#battle-over").classList.remove("hidden");

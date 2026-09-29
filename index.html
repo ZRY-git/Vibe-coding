@@ -26,14 +26,42 @@
             <li>移动速度 <b id="stat-speed">100%</b></li>
           </ul>
         </div>
-        <div class="panel">
-          <h3>装备栏 / 饰品栏</h3>
-          <div class="slots">
-            <div class="slot" id="slot-gloves">力量手套 ×0</div>
-            <div class="slot" id="slot-bracers">皮护腕 ×0</div>
-            <div class="slot" id="slot-pendant">workbuddy挂坠 ×0</div>
+        <div class="panel panel-equip">
+          <h3>装备栏</h3>
+          <div class="equip-row" id="slot-weapon">
+            <span class="equip-label">武器1:</span>
+            <div class="equip-box">
+              <span class="equip-icon"><img src="assets/血染荒城.png" alt="血染荒城"></span>
+              <span class="equip-name" id="weapon-count">血染荒城 ×0</span>
+            </div>
           </div>
-          <p class="hint">获得即生效 · 只增不减</p>
+          <h3>饰品栏</h3>
+          <div class="equip-row" id="slot-pendant">
+            <span class="equip-label">饰品1:</span>
+            <div class="equip-box">
+              <span class="equip-icon"><img src="assets/workbuddy-pendant-icon.png" alt="workbuddy吊坠"></span>
+              <span class="equip-name" id="pendant-count">workbuddy挂坠 ×0</span>
+            </div>
+          </div>
+          <div class="equip-row is-empty">
+            <span class="equip-label">饰品2:</span>
+            <div class="equip-box">
+              <span class="equip-icon"></span>
+            </div>
+          </div>
+          <div class="equip-row is-empty">
+            <span class="equip-label">饰品3:</span>
+            <div class="equip-box">
+              <span class="equip-icon"></span>
+            </div>
+          </div>
+          <div class="equip-row is-empty">
+            <span class="equip-label">饰品4:</span>
+            <div class="equip-box">
+              <span class="equip-icon"></span>
+            </div>
+          </div>
+          <p class="hint">获得即生效 · 只增不减 · workbuddy吊坠：分数获得效率 +20%</p>
         </div>
         <div class="panel">
           <h3>分数</h3>
@@ -77,11 +105,13 @@
         <span>本局分数 <b id="hud-score">0</b></span>
       </div>
       <div class="battle-wrap">
-        <canvas id="battle-canvas" width="800" height="360"></canvas>
+        <canvas id="battle-canvas" width="1200" height="600"></canvas>
         <div id="battle-over" class="hidden">
           <h3>本局结束（战败零损失）</h3>
           <ul class="stats">
             <li>本局分数 <b id="result-score">0</b></li>
+            <li>吊坠加成 <b id="result-bonus">+0</b></li>
+            <li>入账总分 <b id="result-final">0</b></li>
             <li>撑到第 <b id="result-wave">1</b> 波</li>
             <li>击杀 <b id="result-kills">0</b></li>
           </ul>
