@@ -352,7 +352,8 @@ const SWING_RANGE = 60;              // 挥砍判定范围（面前多少 px 内
 const CHARGE_TIME = 8;               // 蓄满所需秒数
 const CHARGE_MAX = 2;                // 蓄满时武器的长宽倍数
 const CHARGE_DELAY = 0.35;           // 按住超过这个时长才转入蓄力（更短的按下仍算普通挥砍）
-const GIANT_GROW = 0.5, GIANT_HOLD = 5, GIANT_SHRINK = 1;   // 0.5s 变大 / 5s 持续 / 1s 恢复
+const GIANT_GROW = 0.5, GIANT_HOLD = 5, GIANT_SHRINK = 1;   // 0.5s 变大 / 5s 持续 / 1s 恢复（时间节点不变）
+const GIANT_MAX = 3;                 // 法天象地最大体型倍率（长宽 ×3）；与武器倍率 CHARGE_MAX 互相独立
 let battle = null;
 
 function createBattle() {
@@ -369,7 +370,7 @@ function createBattle() {
       swingRange: 1,      // 本次挥砍的范围倍率（蓄力未满松手 / 法天象地时会 >1）
       giant: null,        // 法天象地阶段：null | "grow" | "hold" | "shrink"
       giantT: 0,          // 当前阶段已过秒数
-      giantScale: 1       // 体型倍率 1 → 2（变大 0.5s、持续 5s、恢复 1s 内均匀变化）
+      giantScale: 1       // 体型倍率 1 → GIANT_MAX(3)（变大 0.5s、持续 5s、恢复 1s 内均匀变化）
     },
     monsters: [], toSpawn: 5, spawnTimer: 0.5, betweenTimer: 0,
     shockwaves: [], shockTimer: 0, slamX: 0, mobId: 0,
@@ -398,9 +399,14 @@ function spawnMonster(b) {
 }
 
 // ============ 三尖两面刀技能「法天象地」 ============
-// 武器当前放大倍率：蓄力时随蓄力进度均匀 1 → 2；法天象地期间跟随体型（变大阶段一进来就是满倍率）
+// 武器当前放大倍率：蓄力时随蓄力进度均匀 1 → 2；法天象地期间维持蓄满的 2 倍
+// 注意：武器倍率（CHARGE_MAX=2）与体型倍率（GIANT_MAX=3）刻意解耦——若跟随体型，×3 会把武器拉到 720px 冲出画面顶部
 function weaponScale(p) {
-  if (p.giant) return p.giant === "grow" ? CHARGE_MAX : p.giantScale;
+  if (p.giant) {
+    return p.giant === "shrink"
+      ? 1 + (CHARGE_MAX - 1) * (1 - Math.min(1, p.giantT / GIANT_SHRINK))   // 恢复期 2 → 1
+      : CHARGE_MAX;                                                          // 变大期一进来就是满倍率，最大体型期保持
+  }
   if (p.charge > 0) return 1 + (p.charge / CHARGE_TIME) * (CHARGE_MAX - 1);
   return 1;
 }
@@ -417,18 +423,18 @@ function startGiant(p) {
   p.giant = "grow"; p.giantT = 0; p.giantScale = 1;
   showWeaponMsg("法天象地！体型暴涨，撞到即秒杀（5 秒）");
 }
-// 三阶段推进：0.5s 变大 → 5s 最大体型 → 1s 恢复，倍率随时间均匀变化
+// 三阶段推进：0.5s 变大 → 5s 最大体型 → 1s 恢复，倍率随时间均匀变化（时间节点不随最大倍率改变）
 function updateGiant(p, dt) {
   if (!p.giant) return;
   p.giantT += dt / 1000;
   if (p.giant === "grow") {
-    p.giantScale = 1 + Math.min(1, p.giantT / GIANT_GROW);
-    if (p.giantT >= GIANT_GROW) { p.giant = "hold"; p.giantT = 0; p.giantScale = 2; }
+    p.giantScale = 1 + (GIANT_MAX - 1) * Math.min(1, p.giantT / GIANT_GROW);
+    if (p.giantT >= GIANT_GROW) { p.giant = "hold"; p.giantT = 0; p.giantScale = GIANT_MAX; }
   } else if (p.giant === "hold") {
-    p.giantScale = 2;
+    p.giantScale = GIANT_MAX;
     if (p.giantT >= GIANT_HOLD) { p.giant = "shrink"; p.giantT = 0; }
   } else {
-    p.giantScale = 2 - Math.min(1, p.giantT / GIANT_SHRINK);
+    p.giantScale = GIANT_MAX - (GIANT_MAX - 1) * Math.min(1, p.giantT / GIANT_SHRINK);
     if (p.giantT >= GIANT_SHRINK) { p.giant = null; p.giantT = 0; p.giantScale = 1; }
   }
   // 碰撞盒随体型缩放：保持中心不变、脚底不离开地面
@@ -736,7 +742,8 @@ function draw() {
   // 法天象地：金色光环（体型倍率越大越亮），让「变大了」这件事一眼可见
   if (p.giant) {
     ctx.save();
-    ctx.strokeStyle = `rgba(255, 208, 64, ${0.35 + 0.5 * (p.giantScale - 1)})`;
+    // 透明度封顶 0.95：体型倍率已是 3，不封顶会算出 alpha=1.35 的非法颜色导致描边失效
+    ctx.strokeStyle = `rgba(255, 208, 64, ${Math.min(0.95, 0.35 + 0.5 * (p.giantScale - 1))})`;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.ellipse(p.x + p.w / 2, p.y + p.h / 2, p.w * 0.85, p.h * 0.62, 0, 0, Math.PI * 2);
