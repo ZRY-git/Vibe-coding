@@ -64,6 +64,14 @@
               <span class="equip-name" id="weapon-count">血染荒城 ×0</span>
             </div>
           </div>
+          <!-- 武器2 槽位（Day 11）：两面三尖刀素材已到位，图标固定，名称/数量由 game.js 渲染 -->
+          <div class="equip-row" id="slot-weapon2">
+            <span class="equip-label">武器2:</span>
+            <div class="equip-box">
+              <span class="equip-icon"><img src="assets/两面三尖刀.png" alt="两面三尖刀"></span>
+              <span class="equip-name" id="weapon2-count">两面三尖刀 ×0</span>
+            </div>
+          </div>
           <h3>饰品栏</h3>
           <div class="equip-row" id="slot-pendant">
             <span class="equip-label">饰品1:</span>
@@ -118,6 +126,7 @@
         <span>击杀 <b id="hud-kills">0</b></span>
         <span>生命 <b id="hud-hp">10</b></span>
         <span>本局分数 <b id="hud-score">0</b></span>
+        <span>武器 <b id="hud-weapon">血染荒城</b></span>
       </div>
       <div class="battle-wrap">
         <canvas id="battle-canvas" width="1200" height="600"></canvas>
@@ -136,7 +145,7 @@
           </div>
         </div>
       </div>
-      <p class="hint" id="battle-tip">操作：← → / A D 移动 · ↑ / W / 空格 跳跃 · J 攻击（怪从左右两侧进场，本期只做陆军）</p>
+      <p class="hint" id="battle-tip">操作：← → / A D 移动 · ↑ / W / 空格 跳跃 · J 攻击 · 1/2 切换武器 · 手持两面三尖刀时<b>长按 J 蓄力 8 秒</b>，蓄满松开释放「法天象地」（怪从左右两侧进场，本期只做陆军）</p>
     </section>
   </main>
 

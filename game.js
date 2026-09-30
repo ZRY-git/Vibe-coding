@@ -30,7 +30,7 @@ function loadState() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { saved = null; }
   const base = {
-    stamina: 10, weapon: 0, pendants: 0,
+    stamina: 10, weapon: 0, weapon2: 0, activeWeapon: 1, pendants: 0,
     bestScore: 0, weeklyScore: 0, weekKey: "",
     unlockedTitles: [], chosenTitle: "",
     character: "m"   // 我的角色：m = Henry（男），f = Rena（女）
@@ -52,6 +52,9 @@ try { runs = JSON.parse(localStorage.getItem(RUNS_KEY)) || []; } catch (e) { run
 
 // workbuddy 吊坠保底发放：确保存档里至少有 1 个（验收条件：发放并装在饰品栏）
 if (state.pendants < 1) { state.pendants = 1; saveAll(); }
+
+// 两面三尖刀保底发放：确保存档里至少有 1 把（验收条件：发放并装在武器2栏）
+if (state.weapon2 < 1) { state.weapon2 = 1; saveAll(); }
 
 function saveAll() {
   localStorage.setItem(SAVE_KEY, JSON.stringify(state));
@@ -78,9 +81,14 @@ function checkTitles() {
 }
 
 // ============ 角色精灵（待机 / 行走 sprite sheet，帧等宽横排） ============
+// hand = 每帧「右手」在帧内的像素坐标（武器握持点）：
+//   idle 为正面照（右手在画面左侧，男插兜/女叉腰，肤色检测+放大目测标定）
+//   walk 为侧面照（右手为近侧拳，按肤色像素聚类中心标定；帧1为跨步/空中定格帧）
 const CHAR_META = {
-  m: { name: "Henry", idle: { src: "assets/char-m-idle.png", frames: 2 }, walk: { src: "assets/char-m-walk.png", frames: 4 } },
-  f: { name: "Rena",  idle: { src: "assets/char-f-idle.png", frames: 2 }, walk: { src: "assets/char-f-walk.png", frames: 4 } }
+  m: { name: "Henry", idle: { src: "assets/char-m-idle.png", frames: 2 }, walk: { src: "assets/char-m-walk.png", frames: 4 },
+       hand: { idle: [[13, 81], [13, 81]], walk: [[37, 76], [22, 80], [36, 76], [38, 76]] } },
+  f: { name: "Rena",  idle: { src: "assets/char-f-idle.png", frames: 2 }, walk: { src: "assets/char-f-walk.png", frames: 4 },
+       hand: { idle: [[14, 80], [14, 80]], walk: [[34, 78], [16, 81], [33, 78], [36, 76]] } }
 };
 Object.values(CHAR_META).forEach(c => {
   [c.idle, c.walk].forEach(s => { s.img = new Image(); s.img.src = s.src; });
@@ -138,6 +146,10 @@ function renderHome() {
   const rowWeapon = $("#slot-weapon");
   $("#weapon-count").textContent = `血染荒城 ×${state.weapon}`;
   rowWeapon.classList.toggle("owned", state.weapon > 0);
+  const rowWeapon2 = $("#slot-weapon2");
+  $("#weapon2-count").textContent = `两面三尖刀 ×${state.weapon2}`;
+  rowWeapon2.classList.toggle("owned", state.weapon2 > 0);
+  rowWeapon2.classList.toggle("empty", state.weapon2 === 0);
   const slotPendant = $("#slot-pendant");
   $("#pendant-count").textContent = `workbuddy挂坠 ×${state.pendants}`;
   slotPendant.classList.toggle("owned", state.pendants > 0);
@@ -265,27 +277,68 @@ function finishLearning() {
 // ============ 战斗页（2D 横版 · 陆军 · 无尽波次） ============
 const cv = $("#battle-canvas");
 const ctx = cv.getContext("2d");
-// 血染荒城手持图（已抠透明背景）
-const weaponImg = new Image();
-weaponImg.src = "assets/血染荒城-hand.png";
+// 血染荒城长柄版：只把枪柄拉长 1.5 倍（刀头与坠饰像素原样保留，见 assets 生成脚本记录）
+const weaponImgLong = new Image();
+weaponImgLong.src = "assets/血染荒城-hand-long.png";
+// 两面三尖刀手持图（原图顺时针转 45° 转正裁切：刃口朝上、柄垂直向下）
+const weapon2Img = new Image();
+weapon2Img.src = "assets/两面三尖刀-hand.png";
 
-// 把武器画在玩家手上：尺寸随人物放大（人物 128px，武器 ≈148px，保持原有人枪比例），握点 = 切断的杆口
+// 武器注册表（Day 11 追加：战斗中按 1/2 切换手上武器）
+// lean = 贴图自带的倾斜补偿角：血染荒城手持图斜 32.5°，两面三尖刀已转正为 0°
+// drawH = 画布上的持握高度。血染荒城长柄版 734×697，drawH 186 ≈ 原 148/556 的放大倍率（0.266），
+//         即刀头渲染尺寸与旧版完全一致，只有柄变长；grip 按新素材柄末端实测 (0.599, 1.00)
+// 注意：挥砍命中判定用的是固定 60px 范围，与 drawH 无关，改大小不影响平衡
+const WEAPONS = {
+  1: { name: "血染荒城",   img: weaponImgLong, lean: 32.5, gripX: 0.599, gripY: 1.00, drawH: 186, owned: () => state.weapon > 0 },
+  2: { name: "两面三尖刀", img: weapon2Img,    lean: 0,    gripX: 0.524, gripY: 1.00, drawH: 240, owned: () => state.weapon2 > 0 }
+};
+const curWeapon = () => WEAPONS[state.activeWeapon] || WEAPONS[1];
+
+// 当前应显示的精灵帧（draw 与 drawWeapon 共用，保证武器和身体始终同一帧）
+// 同时返回该帧的右手锚点 hand，避免调用方再去猜 sheet/frame 的对应关系
+function playerFrame(p) {
+  const ch = curChar();
+  let kind, fi;
+  if (!p.onGround) { kind = "walk"; fi = 1; }                                        // 跳跃/下落：跨步定格
+  else if (p.moving) { kind = "walk"; fi = Math.floor(p.animT / 0.12) % ch.walk.frames; }
+  else { kind = "idle"; fi = Math.floor(p.animT / 0.7) % ch.idle.frames; }
+  const sheet = ch[kind];
+  const fw = sheet.img.naturalWidth ? sheet.img.naturalWidth / sheet.frames : 0;
+  // 兜底：锚点数据缺失时退回身体中线、脚底上方 50px，绝不让绘制抛错拖死整个游戏循环
+  const hand = (ch.hand && ch.hand[kind] && ch.hand[kind][fi]) || [fw / 2, 78];
+  return { sheet, fi, hand };
+}
+
+// 把武器画在玩家手上：握点 = 当前角色帧的右手锚点（CHAR_META.hand），随待机/行走/跳跃逐帧跟随
 function drawWeapon(p) {
-  if (state.weapon < 1 || !weaponImg.complete || !weaponImg.naturalWidth) return;
-  const H = 148, W = H * weaponImg.naturalWidth / weaponImg.naturalHeight;
-  const gripX = W * 0.50, gripY = H * 0.98;
+  const w = curWeapon();
+  if (!w.owned() || !w.img.complete || !w.img.naturalWidth) return null;
+  const { sheet, fi, hand } = playerFrame(p);
+  if (!sheet.img.complete || !sheet.img.naturalWidth) return null;
+  const fw = sheet.img.naturalWidth / sheet.frames;
+  // 手的世界坐标：精灵脚踩 p.y+p.h、高 128、水平居中于碰撞盒；锚点先转成精灵局部坐标再按朝向翻转
+  // 法天象地时精灵与碰撞盒同步放大，手部锚点也要按同一倍率缩放，武器才不会脱离手
+  const gs = p.giantScale;
+  const [ax, ay] = hand;
+  const handX = p.x + p.w / 2 + p.face * (ax - fw / 2) * gs;
+  const handY = p.y + p.h - (128 - ay) * gs;
+  // 武器整体（长宽）按蓄力进度 / 体型倍率放大
+  const H = w.drawH * weaponScale(p), W = H * w.img.naturalWidth / w.img.naturalHeight;
+  const gripX = W * w.gripX, gripY = H * w.gripY;
+  const L = w.lean * Math.PI / 180;
   ctx.save();
-  // 手的位置：精灵脚踩 p.y+p.h、高 128px，手部约在脚底上方 50px、身体中线略前
-  ctx.translate(p.x + p.w / 2 + p.face * 8, p.y + p.h - 50);
+  ctx.translate(handX, handY);
   ctx.scale(p.face, 1);                       // 朝向翻转
-  const base = 77.5 * Math.PI / 180;          // 平时 45° 斜握（枪头指向前上方 45°）
+  const base = (45 + w.lean) * Math.PI / 180; // 平时 45° 斜握（叠加贴图固有倾角）
   let ang;
-  if (p.slamming) ang = base + 135 * Math.PI / 180;   // 快速下砸时：枪头朝正下（-90°）
-  else if (p.swing > 0) ang = (32.5 + (1 - p.swing / SWING_TIME) * 90) * Math.PI / 180;   // 挥砍：枪头从 90°(上) 抡到 0°(前)
+  if (p.slamming) ang = base + 135 * Math.PI / 180;   // 快速下砸时：枪头朝正下
+  else if (p.swing > 0) ang = L + (1 - p.swing / SWING_TIME) * 90 * Math.PI / 180;   // 挥砍：枪头从 90°(上) 抡到 0°(前)
   else ang = base;
   ctx.rotate(ang);
-  ctx.drawImage(weaponImg, -gripX, -gripY, W, H);
+  ctx.drawImage(w.img, -gripX, -gripY, W, H);
   ctx.restore();
+  return { x: handX, y: handY };              // 供刀光对齐手部
 }
 const CVW = 1200, CVH = 600, GROUND = 550, GRAV = 0.55, JUMP = -11;
 // 血染荒城技能参数（下砸 500px/s，冲击波传播 300px/s，换算成每帧 px）
@@ -294,20 +347,33 @@ const SHOCK_SPEED = 300 / 60;        // 闪电冲击波向左右传播
 const SHOCK_DMG = 10;                // 冲击波伤害
 const SWING_TIME = 0.25;             // 挥砍动画时长（秒）
 const SWING_CD = 0.1;                // 挥砍完成后的冷却（秒）
+const SWING_RANGE = 60;              // 挥砍判定范围（面前多少 px 内吃到剑气）
+// 三尖两面刀技能「法天象地」：长按 J 蓄力 8s，武器长宽均匀涨到 2 倍；蓄满松开进入法天象地
+const CHARGE_TIME = 8;               // 蓄满所需秒数
+const CHARGE_MAX = 2;                // 蓄满时武器的长宽倍数
+const CHARGE_DELAY = 0.35;           // 按住超过这个时长才转入蓄力（更短的按下仍算普通挥砍）
+const GIANT_GROW = 0.5, GIANT_HOLD = 5, GIANT_SHRINK = 1;   // 0.5s 变大 / 5s 持续 / 1s 恢复
 let battle = null;
 
 function createBattle() {
   return {
     wave: 1, kills: 0, over: false, raf: 0, last: performance.now(),
     player: {
-      x: CVW / 2 - 14, y: GROUND - 44, w: 28, h: 44,
+      x: CVW / 2 - 14, y: GROUND - 44, w: 28, h: 44, bw: 28, bh: 44,   // bw/bh：原始碰撞盒，法天象地时按体型倍率缩放
       vy: 0, hp: 10, face: 1, cd: 0, swing: 0, inv: 0, onGround: true,
       slamming: false, swingHits: new Set(),   // swingHits：本次挥砍已命中的敌人
-      moving: false, animT: 0                  // 动画：是否在走 / 动画累计时间
+      moving: false, animT: 0,                 // 动画：是否在走 / 动画累计时间
+      // 三尖两面刀技能状态
+      charge: 0,          // 蓄力累计秒数（0 ~ CHARGE_TIME），松手未满则清零
+      jHeldT: 0,          // J 键已按住的秒数，用于区分「短按挥砍」与「长按蓄力」
+      swingRange: 1,      // 本次挥砍的范围倍率（蓄力未满松手 / 法天象地时会 >1）
+      giant: null,        // 法天象地阶段：null | "grow" | "hold" | "shrink"
+      giantT: 0,          // 当前阶段已过秒数
+      giantScale: 1       // 体型倍率 1 → 2（变大 0.5s、持续 5s、恢复 1s 内均匀变化）
     },
     monsters: [], toSpawn: 5, spawnTimer: 0.5, betweenTimer: 0,
     shockwaves: [], shockTimer: 0, slamX: 0, mobId: 0,
-    keys: {}
+    keys: {}, weaponMsg: null   // weaponMsg：画布顶部轻提示（切换武器 / 空槽警示）
   };
 }
 
@@ -329,6 +395,48 @@ function spawnMonster(b) {
     vx: fromLeft ? waveSpeed(b.wave) : -waveSpeed(b.wave),
     hp: waveHp(b.wave), maxHp: waveHp(b.wave), dmg: waveDmg(b.wave)
   });
+}
+
+// ============ 三尖两面刀技能「法天象地」 ============
+// 武器当前放大倍率：蓄力时随蓄力进度均匀 1 → 2；法天象地期间跟随体型（变大阶段一进来就是满倍率）
+function weaponScale(p) {
+  if (p.giant) return p.giant === "grow" ? CHARGE_MAX : p.giantScale;
+  if (p.charge > 0) return 1 + (p.charge / CHARGE_TIME) * (CHARGE_MAX - 1);
+  return 1;
+}
+// 触发一次挥砍：rangeScale 作用于判定范围；法天象地期间时长与冷却都翻倍（伤害在判定处 ×2）
+function fireSwing(p, rangeScale) {
+  const g = p.giant !== null;
+  const t = SWING_TIME * (g ? 2 : 1);
+  p.cd = t + SWING_CD * (g ? 2 : 1);
+  p.swing = t;
+  p.swingRange = rangeScale || 1;
+  p.swingHits = new Set();
+}
+function startGiant(p) {
+  p.giant = "grow"; p.giantT = 0; p.giantScale = 1;
+  showWeaponMsg("法天象地！体型暴涨，撞到即秒杀（5 秒）");
+}
+// 三阶段推进：0.5s 变大 → 5s 最大体型 → 1s 恢复，倍率随时间均匀变化
+function updateGiant(p, dt) {
+  if (!p.giant) return;
+  p.giantT += dt / 1000;
+  if (p.giant === "grow") {
+    p.giantScale = 1 + Math.min(1, p.giantT / GIANT_GROW);
+    if (p.giantT >= GIANT_GROW) { p.giant = "hold"; p.giantT = 0; p.giantScale = 2; }
+  } else if (p.giant === "hold") {
+    p.giantScale = 2;
+    if (p.giantT >= GIANT_HOLD) { p.giant = "shrink"; p.giantT = 0; }
+  } else {
+    p.giantScale = 2 - Math.min(1, p.giantT / GIANT_SHRINK);
+    if (p.giantT >= GIANT_SHRINK) { p.giant = null; p.giantT = 0; p.giantScale = 1; }
+  }
+  // 碰撞盒随体型缩放：保持中心不变、脚底不离开地面
+  const cx = p.x + p.w / 2, foot = p.y + p.h;
+  p.w = p.bw * p.giantScale; p.h = p.bh * p.giantScale;
+  p.x = Math.max(0, Math.min(CVW - p.w, cx - p.w / 2));
+  p.y = foot - p.h;
+  if (p.y + p.h > GROUND) p.y = GROUND - p.h;
 }
 
 function startBattle() {
@@ -372,8 +480,8 @@ function update(k, dt) {
   if (p.onGround && (b.keys["ArrowUp"] || b.keys[" "] || b.keys["w"] || b.keys["W"])) {
     p.vy = JUMP; p.onGround = false;
   }
-  // 血染荒城：空中按 J → 以 100px/s 恒定速度快速下砸（需持有武器）
-  if ((b.keys["j"] || b.keys["J"]) && !p.onGround && !p.slamming && state.weapon > 0) p.slamming = true;
+  // 血染荒城：空中按 J → 以 100px/s 恒定速度快速下砸（技能绑定血染荒城，需手持武器1）
+  if ((b.keys["j"] || b.keys["J"]) && !p.onGround && !p.slamming && state.weapon > 0 && state.activeWeapon === 1) p.slamming = true;
   if (p.slamming) { p.vy = SLAM_FALL; }   // 下砸期间不受重力，匀速下落
   else p.vy += GRAV * k;
   p.y += p.vy * k;
@@ -390,20 +498,36 @@ function update(k, dt) {
   p.cd = Math.max(0, p.cd - dt / 1000);
   p.swing = Math.max(0, p.swing - dt / 1000);
   p.inv = Math.max(0, p.inv - dt / 1000);
-  if ((b.keys["j"] || b.keys["J"]) && !p.slamming) {
-    if (p.cd <= 0) {
-      p.cd = SWING_TIME + SWING_CD; p.swing = SWING_TIME;
-      p.swingHits = new Set();
-    }
+  // ===== 三尖两面刀：长按 J 蓄力，蓄满松手释放「法天象地」=====
+  const jHeld = !!(b.keys["j"] || b.keys["J"]);
+  const w2Ready = state.activeWeapon === 2 && curWeapon().owned();
+  p.jHeldT = jHeld ? p.jHeldT + dt / 1000 : 0;
+  // 短按（< 0.35s）仍是普通挥砍；按住超过阈值才转蓄力，蓄力期间不出剑气、不造成伤害
+  const charging = w2Ready && jHeld && !p.slamming && p.giant === null && p.jHeldT > CHARGE_DELAY;
+  if (charging) p.charge = Math.min(CHARGE_TIME, p.charge + dt / 1000);
+  // 松手：蓄满 → 法天象地；未满 → 按当前武器倍率打一次点按挥砍，随后进度清零
+  if (!jHeld && p.charge > 0) {
+    if (p.charge >= CHARGE_TIME) startGiant(p);
+    else if (p.cd <= 0 && !p.slamming) fireSwing(p, weaponScale(p));
+    p.charge = 0;
+  }
+  updateGiant(p, dt);
+  // 普通挥砍（J）：法天象地期间范围 ×2（伤害在判定处 ×2，时长与冷却也在 fireSwing 里翻倍）
+  if (jHeld && !p.slamming && !charging) {
+    if (p.cd <= 0) fireSwing(p, p.giant ? 2 : 1);
   }
   // 剑气伤害：白弧（剑气）出现的挥砍期间才判定，每只怪每次挥砍只中一次
   if (p.swing > 0) {
-    const x1 = p.face > 0 ? p.x + p.w : p.x - 60;
+    const range = SWING_RANGE * (p.swingRange || 1);
+    const x1 = p.face > 0 ? p.x + p.w : p.x - range;
     b.monsters.forEach(m => {
       if (p.swingHits.has(m.id)) return;
       const overlapY = m.y + m.h > p.y && m.y < p.y + p.h;
-      const overlapX = m.x < x1 + 60 && m.x + m.w > x1;
-      if (overlapY && overlapX) { m.hp -= attackPower(); p.swingHits.add(m.id); }
+      const overlapX = m.x < x1 + range && m.x + m.w > x1;
+      if (overlapY && overlapX) {
+        m.hp -= attackPower() * (p.giant ? 2 : 1);   // 法天象地期间伤害翻倍
+        p.swingHits.add(m.id);
+      }
     });
   }
   // 刷怪：每波 5 只，只从左右进场（A7）
@@ -421,10 +545,13 @@ function update(k, dt) {
     m.vx = dir * waveSpeed(b.wave);
     m.x += m.vx * k;
   });
+  // 法天象地：全程无敌；仅「最大体型的 5 秒」内碰到的小怪直接秒杀（变大/恢复过程只无敌不秒）
+  const giantInv = p.giant !== null, giantKill = p.giant === "hold";
   b.monsters = b.monsters.filter(m => {
     if (m.hp <= 0) { b.kills++; return false; }   // 分数 = 击杀数
     const hit = p.x < m.x + m.w && p.x + p.w > m.x && p.y < m.y + m.h && p.y + p.h > m.y;
-    if (hit && p.inv <= 0) {
+    if (hit && giantKill) { b.kills++; return false; }        // 撞到即秒杀
+    if (hit && !giantInv && p.inv <= 0) {
       p.hp -= Math.max(1, m.dmg - defensePower());  // 防御减伤，至少受 1 点
       p.inv = 0.8;
     }
@@ -457,6 +584,25 @@ function updateHud() {
   $("#hud-kills").textContent = battle.kills;
   $("#hud-score").textContent = battle.kills;
   $("#hud-hp").textContent = Math.max(0, battle.player.hp);
+  const cw = curWeapon();
+  $("#hud-weapon").textContent = cw.owned() ? cw.name : "空手";
+}
+
+// ============ 按 1/2 切换手上武器（Day 11 追加） ============
+function switchWeapon(slot) {
+  const w = WEAPONS[slot];
+  if (!w) return;
+  if (!w.owned()) { showWeaponMsg(`武器${slot}还没有武器`); return; }   // 无效操作不静默
+  if (state.activeWeapon === slot) { showWeaponMsg(`手上已经是${w.name}`); return; }
+  state.activeWeapon = slot;
+  saveAll();
+  showWeaponMsg(`已切换：${w.name}`);   // 结果确认：HUD 武器名与手上贴图同步变化
+}
+
+// 战斗画布顶部的轻提示（1.2 秒，最后 0.3 秒淡出）
+function showWeaponMsg(text) {
+  if (!battle) return;
+  battle.weaponMsg = { text, until: performance.now() + 1200 };
 }
 
 // 血染荒城：像素画闪电（24 列 × 28 行，1 格 = 2px → 宽 48px × 高 56px，即旧版宽×3 高×2）
@@ -523,6 +669,38 @@ function drawBolt(fx, tier, s) {
   }
 }
 
+// 技能状态的可视反馈：蓄力进度条 → 蓄满提示 → 法天象地倒计时
+function drawSkillUi(p) {
+  const cx = CVW / 2;
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.font = "bold 16px 'Microsoft YaHei', sans-serif";
+  if (p.giant === "hold") {
+    ctx.fillStyle = "#b8860b";
+    ctx.fillText(`法天象地 · 剩余 ${(GIANT_HOLD - p.giantT).toFixed(1)}s（撞到即秒杀）`, cx, 54);
+  } else if (p.giant) {
+    ctx.fillStyle = "#b8860b";
+    ctx.fillText(p.giant === "grow" ? "法天象地 · 体型暴涨中…" : "法天象地 · 体型恢复中…", cx, 54);
+  } else if (p.charge >= CHARGE_TIME) {
+    // 蓄满：文字呼吸闪烁，提示可以松手释放
+    ctx.globalAlpha = 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 220));
+    ctx.fillStyle = "#c93c0b";
+    ctx.fillText("蓄满！松开 J → 释放「法天象地」", cx, 54);
+  } else if (p.charge > 0) {
+    const r = p.charge / CHARGE_TIME, bw = 260, bh = 10, bx = cx - bw / 2, by = 44;
+    ctx.fillStyle = "rgba(47,93,138,0.25)";
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = "#2f5d8a";
+    ctx.fillRect(bx, by, bw * r, bh);
+    ctx.strokeStyle = "#2f5d8a";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, bw, bh);
+    ctx.fillStyle = "#2f5d8a";
+    ctx.fillText(`蓄力中 ${Math.round(r * 100)}%（武器 ×${weaponScale(p).toFixed(2)}）`, cx, by + 28);
+  }
+  ctx.restore();
+}
+
 function draw() {
   const b = battle, p = b.player;
   ctx.clearRect(0, 0, CVW, CVH);
@@ -536,14 +714,10 @@ function draw() {
   // 玩家：所选角色精灵（待机 2 帧循环 / 行走 4 帧循环 / 空中定格跨步帧）
   const blink = p.inv > 0 && Math.floor(p.inv * 10) % 2 === 0;
   ctx.globalAlpha = blink ? 0.35 : 1;
-  const ch = curChar();
-  let sheet, fi;
-  if (!p.onGround) { sheet = ch.walk; fi = 1; }                       // 跳跃/下落：跨步定格
-  else if (p.moving) { sheet = ch.walk; fi = Math.floor(p.animT / 0.12) % sheet.frames; }
-  else { sheet = ch.idle; fi = Math.floor(p.animT / 0.7) % sheet.frames; }
+  const { sheet, fi } = playerFrame(p);
   if (sheet.img.complete && sheet.img.naturalWidth) {
     const fw = sheet.img.naturalWidth / sheet.frames, fh = sheet.img.naturalHeight;
-    const H = 128, W = H * fw / fh;           // 精灵 128px 高（碰撞盒仍是 28×44，脚踩盒底）
+    const H = 128 * p.giantScale, W = H * fw / fh;   // 精灵 128px 高，法天象地时随体型倍率放大（脚踩盒底）
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     ctx.translate(p.x + p.w / 2, p.y + p.h);
@@ -559,15 +733,37 @@ function draw() {
     ctx.fillRect(eyeX, p.y + 8, 6, 6);
   }
   ctx.globalAlpha = 1;
-  drawWeapon(p);   // 血染荒城挂在手上
-  // 刀光（中心对齐手部高度）
-  if (p.swing > 0) {
+  // 法天象地：金色光环（体型倍率越大越亮），让「变大了」这件事一眼可见
+  if (p.giant) {
+    ctx.save();
+    ctx.strokeStyle = `rgba(255, 208, 64, ${0.35 + 0.5 * (p.giantScale - 1)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(p.x + p.w / 2, p.y + p.h / 2, p.w * 0.85, p.h * 0.62, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  const handPos = drawWeapon(p);   // 当前手持武器挂在手上（按 1/2 切换），返回手部世界坐标
+  // 刀光（圆心对齐当前帧的手部，跟随角色与朝向；范围随武器倍率一起变大）
+  if (p.swing > 0 && handPos) {
+    const rs = p.swingRange || 1;
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 3;
     ctx.beginPath();
-    const cx = p.face > 0 ? p.x + p.w + 26 : p.x - 26;
-    ctx.arc(cx, p.y + p.h - 50, 22, -1.1, 1.1);
+    ctx.arc(handPos.x + p.face * 26 * rs, handPos.y, 22 * rs, -1.1, 1.1);
     ctx.stroke();
+  }
+  drawSkillUi(p);   // 蓄力进度条 / 蓄满提示 / 法天象地剩余时间
+  // 画布顶部轻提示：切换武器结果 / 空槽警示，1.2 秒后淡出
+  if (b.weaponMsg && performance.now() < b.weaponMsg.until) {
+    const left = b.weaponMsg.until - performance.now();
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, left / 300);
+    ctx.font = "bold 16px 'Microsoft YaHei', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#2f5d8a";
+    ctx.fillText(b.weaponMsg.text, CVW / 2, 30);
+    ctx.restore();
   }
   // 怪物：珊瑚色方块
   b.monsters.forEach(m => {
@@ -626,6 +822,11 @@ window.addEventListener("keydown", e => {
   if (battle && GAME_KEYS.includes(e.key)) {
     e.preventDefault();
     battle.keys[e.key] = true;
+  }
+  // 1/2 切换手上武器：一次性动作，不进长按表；只在战斗进行中生效
+  if (battle && !battle.over && (e.key === "1" || e.key === "2")) {
+    e.preventDefault();
+    switchWeapon(Number(e.key));
   }
 });
 window.addEventListener("keyup", e => {
