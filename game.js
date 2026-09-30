@@ -45,10 +45,13 @@ function loadState() {
 }
 
 const state = loadState();
-// workbuddy 吊坠保底发放：确保存档里至少有 1 个（验收条件：发放并装在饰品栏）
-if (state.pendants < 1) { state.pendants = 1; saveAll(); }
+// runs 必须先于下面的吊坠保底初始化：saveAll() 里会用到 runs，
+// 顺序反了会让全新浏览器（localStorage 为空）在保底发放时直接 ReferenceError，整页 JS 挂掉
 let runs = [];
 try { runs = JSON.parse(localStorage.getItem(RUNS_KEY)) || []; } catch (e) { runs = []; }
+
+// workbuddy 吊坠保底发放：确保存档里至少有 1 个（验收条件：发放并装在饰品栏）
+if (state.pendants < 1) { state.pendants = 1; saveAll(); }
 
 function saveAll() {
   localStorage.setItem(SAVE_KEY, JSON.stringify(state));
