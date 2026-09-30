@@ -632,6 +632,45 @@ window.addEventListener("keyup", e => {
   if (battle && GAME_KEYS.includes(e.key)) battle.keys[e.key] = false;
 });
 
+// ============ 称号「设为展示」的三层反馈（Day 11） ============
+// 第 1 层即时反馈（按下就有反应）由 style.css 的 button:active 负责，Day 9 已做，这里不重复。
+// 本节只补第 2 层（按钮状态反馈）与第 3 层（结果确认反馈）。
+// 定时器集中放在 titleFx：连续快速点击时先清掉上一次的，避免多个定时器互相打架。
+const titleFx = { btn: 0, feedback: 0, flashOff: 0 };
+
+// 第 3 层 · 结果确认 A：按钮下方滑出提示条（role=status，屏幕阅读器也会念）
+function showTitleFeedback(text, kind) {
+  const fb = $("#title-feedback");
+  if (!fb) return;
+  fb.textContent = text;
+  fb.className = `title-feedback show ${kind}`;
+  clearTimeout(titleFx.feedback);
+  titleFx.feedback = setTimeout(() => { fb.className = `title-feedback ${kind}`; }, 2500);
+}
+
+// 第 3 层 · 结果确认 B：「当前展示」那一行闪一下，把视线引到结果上
+function flashTitleRow() {
+  const row = $("#title-row");
+  if (!row) return;
+  row.classList.remove("flash");
+  void row.offsetWidth;                     // 强制重排，动画才能被连续触发重播
+  row.classList.add("flash");
+  clearTimeout(titleFx.flashOff);
+  titleFx.flashOff = setTimeout(() => row.classList.remove("flash"), 1100);
+}
+
+// 第 2 层 · 状态反馈：按钮自身短暂变成「已生效 ✓」再自动复原
+function markTitleSaved() {
+  const btn = $("#title-save");
+  btn.classList.add("is-done");
+  btn.textContent = "已生效 ✓";
+  clearTimeout(titleFx.btn);
+  titleFx.btn = setTimeout(() => {
+    btn.classList.remove("is-done");
+    btn.textContent = "设为展示";
+  }, 1600);
+}
+
 // ============ 事件绑定 ============
 document.addEventListener("DOMContentLoaded", () => {
   renderHome();
@@ -651,10 +690,30 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#title-select").addEventListener("change", e => {
     $("#title-input").style.display = e.target.value === "__custom" ? "" : "none";
   });
+  // 称号「设为展示」（Day 11：补上状态反馈与结果确认反馈）
   $("#title-save").addEventListener("click", () => {
-    const v = $("#title-select").value;
-    state.chosenTitle = v === "__custom" ? $("#title-input").value.trim() : v;
+    const sel = $("#title-select");
+    const v = sel.value;
+    const text = v === "__custom" ? $("#title-input").value.trim() : v;
+
+    // 边界 1：一个称号都没解锁时点按钮 —— 无效操作也必须给出反馈，不能静默无反应
+    if (sel.disabled) {
+      showTitleFeedback("还没有可展示的称号：本周累计满 50 分才能解锁「学习王」", "warn");
+      return;
+    }
+    // 边界 2：选了自定义文字但输入框是空的
+    if (v === "__custom" && text === "") {
+      showTitleFeedback("请先输入称号文字，再点「设为展示」", "warn");
+      $("#title-input").focus();
+      return;
+    }
+
+    // 正常生效
+    state.chosenTitle = text;
     saveAll();
-    renderHome();
+    renderHome();                                     // 上方「当前展示」立即更新
+    markTitleSaved();                                 // 第 2 层：按钮进入已生效态
+    showTitleFeedback(`称号已生效：${text}`, "ok");    // 第 3 层 A：提示条
+    flashTitleRow();                                   // 第 3 层 B：结果行闪一下
   });
 });

@@ -45,12 +45,13 @@
           </div>
           <div class="panel">
             <h3>称号</h3>
-            <p>当前展示：<b id="title-current">暂无</b></p>
+            <p class="title-row" id="title-row">当前展示：<b id="title-current">暂无</b></p>
             <div class="row">
               <select id="title-select"></select>
               <input id="title-input" type="text" placeholder="自定义称号文字" maxlength="10" style="display:none">
               <button id="title-save">设为展示</button>
             </div>
+            <p class="title-feedback" id="title-feedback" role="status" aria-live="polite"></p>
             <p class="hint" id="title-progress"></p>
           </div>
         </div>

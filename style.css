@@ -352,3 +352,57 @@ select, input[type="text"] {
 /* 主页专属修复（Day 9）：提示文字与列表内容对齐、间距统一 */
 .page-home .hint { margin: 16px 0 0; padding-left: 16px; }
 .page-home .foot { color: var(--muted-strong); }
+
+/* ===== 称号「设为展示」的三层反馈（Day 11） =====
+   第 1 层即时反馈：沿用 Day 9 的全站 button:active 下沉，此处不重复做。
+   本段只补第 2 层（按钮状态反馈）与第 3 层（结果确认反馈）。 */
+
+/* 按钮固定宽度：文字在「设为展示 / 已生效 ✓」之间切换时整行不跳动 */
+#title-save { min-width: 112px; }
+
+/* 第 2 层 · 状态反馈：点击生效后按钮自身进入短暂「已生效」态 */
+#title-save.is-done {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+/* 第 3 层 · 结果确认 A：按钮下方滑出提示条
+   min-height 占位，避免出现/消失时下方内容跳动 */
+.title-feedback {
+  margin: 8px 0 0;
+  min-height: 20px;
+  font-size: 13px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.title-feedback.show { opacity: 1; transform: translateY(0); }
+.title-feedback.ok { color: #8ee0c0; }      /* 深木底上用浅绿，保证可读 */
+.title-feedback.warn { color: #ffd08a; }
+
+/* 第 3 层 · 结果确认 B：「当前展示」那一行闪一下，把视线引到结果上 */
+.title-row {
+  margin: 0 0 4px;
+  padding: 3px 8px;
+  margin-left: -8px;        /* 负边距抵消 padding，文字仍与面板其他内容左对齐 */
+  border-radius: 6px;
+}
+.title-row.flash { animation: titleFlash 1s ease; }
+@keyframes titleFlash {
+  0% { background: rgba(245, 236, 216, 0.3); }
+  100% { background: transparent; }
+}
+/* 减少动效偏好：只保留颜色提示，不做位移与闪烁过渡 */
+@media (prefers-reduced-motion: reduce) {
+  .title-feedback { transition: none; transform: none; }
+  .title-row.flash { animation: none; background: rgba(245, 236, 216, 0.2); }
+}
+
+/* 加练 · 焦点状态：深木底上默认的墨绿描边对比不足，改用金色 */
+.page-game #view-home .panel button:focus-visible,
+.page-game #view-home .panel select:focus-visible,
+.page-game #view-home .panel input:focus-visible {
+  outline: 2px solid #ffd94a;
+  outline-offset: 2px;
+}
