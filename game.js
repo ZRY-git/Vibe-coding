@@ -374,7 +374,7 @@ function createBattle() {
     },
     monsters: [], toSpawn: 5, spawnTimer: 0.5, betweenTimer: 0,
     shockwaves: [], shockTimer: 0, slamX: 0, mobId: 0,
-    keys: {}, weaponMsg: null   // weaponMsg：画布顶部轻提示（切换武器 / 空槽警示）
+    keys: {}, moveScale: 1, weaponMsg: null   // moveScale：摇杆力度（键盘恒为 1，摇杆按推动幅度 0.5~1）
   };
 }
 
@@ -450,6 +450,14 @@ function startBattle() {
   battle = createBattle();
   $("#battle-over").classList.add("hidden");
   $("#battle-tip").style.display = "";
+  if (padEl) {
+    padEl.classList.remove("pad-off");            // 战局开始：重新露出触屏操作层
+    // 手机屏比页面短，画布常在视野外——开战时把战斗区滚进屏幕（仅触屏层可见时才做）
+    if (padEl.offsetParent !== null) {
+      const v = $("#view-battle");
+      if (v && v.scrollIntoView) v.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
+  }
   updateHud();
   battle.raf = requestAnimationFrame(tick);
 }
@@ -473,8 +481,8 @@ function tick(now) {
 
 function update(k, dt) {
   const b = battle, p = b.player;
-  // 左右移动（移速由体力换算）
-  const sp = moveSpeed();
+  // 左右移动（移速由体力换算；moveScale 是摇杆力度，键盘恒为 1）
+  const sp = moveSpeed() * b.moveScale;
   const goL = b.keys["ArrowLeft"] || b.keys["a"] || b.keys["A"];
   const goR = b.keys["ArrowRight"] || b.keys["d"] || b.keys["D"];
   if (goL) { p.x -= sp * k; p.face = -1; }
@@ -592,6 +600,7 @@ function updateHud() {
   $("#hud-hp").textContent = Math.max(0, battle.player.hp);
   const cw = curWeapon();
   $("#hud-weapon").textContent = cw.owned() ? cw.name : "空手";
+  updatePadWeapon();                 // 触屏「换武器」键面同步显示当前武器
 }
 
 // ============ 按 1/2 切换手上武器（Day 11 追加） ============
@@ -801,6 +810,8 @@ function draw() {
 
 function showBattleOver() {
   const b = battle;
+  if (padEl) padEl.classList.add("pad-off");   // 结算页：收起触屏层，避免挡住「再来一局 / 返回主页」
+  clearAllInput();                             // 顺手清掉按住状态，防止下一局一进场就自动跑/自动攻击
   // workbuddy 吊坠加成：拥有 ≥1 个即生效，入账分 = 击杀数 × 1.2（四舍五入）
   const base = b.kills;
   const bonus = state.pendants > 0 ? Math.round(base * 0.2) : 0;
@@ -839,6 +850,113 @@ window.addEventListener("keydown", e => {
 window.addEventListener("keyup", e => {
   if (battle && GAME_KEYS.includes(e.key)) battle.keys[e.key] = false;
 });
+
+// ============ 手机触屏操作：左半屏浮动摇杆 + 右下功能键 ============
+// 设计要点：不改动任何战斗逻辑，只把触摸“翻译”成同一张 battle.keys 键表。
+// 因此蓄力（按住 J 超过 0.35s）、空中下砸、法天象地松手释放等行为全部自动沿用，
+// 键盘与触屏是同一套判定，不会出现两套规则各自演化的问题。
+const padEl = $("#touch-pad");
+const padLeft = $("#pad-left"), joyBase = $("#joy-base"), joyKnob = $("#joy-knob");
+const pad = { id: null, cx: 0, cy: 0, r: 34 };   // r = 摇杆最大行程（px）
+
+function setKey(k, v) { if (battle && !battle.over) battle.keys[k] = !!v; }
+
+// 失焦/切后台时清空所有按住状态：避免“松手事件丢失”导致角色一直朝一个方向跑
+function clearAllInput() {
+  if (battle) for (const k of Object.keys(battle.keys)) battle.keys[k] = false;
+  releaseJoy();
+  ["#pad-atk", "#pad-jump"].forEach(s => { const el = $(s); if (el) el.classList.remove("is-down"); });
+}
+window.addEventListener("blur", clearAllInput);
+document.addEventListener("visibilitychange", () => { if (document.hidden) clearAllInput(); });
+
+// 摇杆：手指落在左半屏的哪个位置，摇杆就地出现（经典手游做法，命中区域大）
+function padPoint(e, el) {
+  const r = el.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+function releaseJoy() {
+  pad.id = null;
+  if (joyBase) { joyBase.style.display = "none"; if (joyKnob) joyKnob.style.transform = "translate(-50%, -50%)"; }
+  setKey("ArrowLeft", false);
+  setKey("ArrowRight", false);
+  if (battle) battle.moveScale = 1;
+}
+function joyStart(e) {
+  if (!battle || battle.over) return;
+  const p = padPoint(e, padLeft);
+  pad.id = (e.pointerId === undefined ? 1 : e.pointerId);
+  pad.cx = p.x; pad.cy = p.y;
+  joyBase.style.left = p.x + "px";
+  joyBase.style.top = p.y + "px";
+  joyBase.style.display = "block";
+  if (padLeft.setPointerCapture) { try { padLeft.setPointerCapture(pad.id); } catch (err) { /* 某些环境不支持，忽略 */ } }
+  e.preventDefault();
+  joyMove(e);
+}
+function joyMove(e) {
+  if (pad.id === null) return;
+  if (e.pointerId !== undefined && e.pointerId !== pad.id) return;   // 多指：只跟摇杆那根手指
+  const p = padPoint(e, padLeft);
+  let dx = p.x - pad.cx;
+  const dist = Math.abs(dx);
+  if (dist > pad.r) dx = (dx < 0 ? -1 : 1) * pad.r;                  // 超出行程就贴边
+  if (joyKnob) joyKnob.style.transform = `translate(calc(-50% + ${dx}px), -50%)`;
+  const DEAD = 8;                                                    // 死区，避免手指微抖就走动
+  setKey("ArrowLeft", dx < -DEAD);
+  setKey("ArrowRight", dx > DEAD);
+  // 力度：推动幅度换算成 0.5~1 倍速（轻推慢走、推满全速）
+  if (battle) battle.moveScale = Math.min(1, Math.max(0.5, dist / pad.r));
+  e.preventDefault();
+}
+if (padLeft) {
+  padLeft.addEventListener("pointerdown", joyStart);
+  padLeft.addEventListener("pointermove", joyMove);
+  padLeft.addEventListener("pointerup", releaseJoy);
+  padLeft.addEventListener("pointercancel", releaseJoy);
+  padLeft.addEventListener("lostpointercapture", releaseJoy);
+  padLeft.addEventListener("contextmenu", e => e.preventDefault());
+}
+
+// 按住类功能键：按下置键、松手清键（与键盘同一个 key，逻辑完全复用）
+function bindHoldKey(sel, key) {
+  const el = $(sel);
+  if (!el) return;
+  const down = e => {
+    if (!battle || battle.over) return;
+    e.preventDefault();
+    setKey(key, true);
+    el.classList.add("is-down");
+    if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId === undefined ? 1 : e.pointerId); } catch (err) { /* 忽略 */ } }
+  };
+  const up = e => { e.preventDefault(); setKey(key, false); el.classList.remove("is-down"); };
+  el.addEventListener("pointerdown", down);
+  el.addEventListener("pointerup", up);
+  el.addEventListener("pointercancel", up);
+  el.addEventListener("lostpointercapture", up);
+  el.addEventListener("contextmenu", e => e.preventDefault());
+}
+bindHoldKey("#pad-jump", " ");   // 跳跃：等价于键盘空格
+bindHoldKey("#pad-atk", "j");    // 攻击 / 蓄力：等价于键盘 J（短按挥砍，按住 >0.35s 蓄力）
+
+// 换武器：手机上一个键循环切换 1↔2，键面直接显示当前手持武器（切换结果一眼可见）
+function updatePadWeapon() {
+  const el = $("#pad-swap-name");
+  if (!el || !battle) return;
+  const cw = curWeapon();
+  const t = cw.owned() ? cw.name : "空手";
+  if (el.textContent !== t) el.textContent = t;
+}
+const padSwap = $("#pad-swap");
+if (padSwap) {
+  padSwap.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    if (!battle || battle.over) return;
+    switchWeapon(state.activeWeapon === 1 ? 2 : 1);
+    updatePadWeapon();
+  });
+  padSwap.addEventListener("contextmenu", e => e.preventDefault());
+}
 
 // ============ 称号「设为展示」的三层反馈（Day 11） ============
 // 第 1 层即时反馈（按下就有反应）由 style.css 的 button:active 负责，Day 9 已做，这里不重复。

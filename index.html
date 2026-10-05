@@ -130,6 +130,17 @@
       </div>
       <div class="battle-wrap">
         <canvas id="battle-canvas" width="1200" height="600"></canvas>
+        <!-- 手机触屏操作层（左半屏浮动摇杆 + 右下功能键）；桌面/鼠标环境由 CSS 隐藏 -->
+        <div id="touch-pad" class="touch-pad">
+          <div class="pad-left" id="pad-left" aria-label="移动摇杆区域">
+            <div class="joy-base" id="joy-base"><span class="joy-knob" id="joy-knob"></span></div>
+          </div>
+          <div class="pad-right">
+            <button type="button" class="pad-btn pad-swap" id="pad-swap">换武器<b id="pad-swap-name">血染荒城</b></button>
+            <button type="button" class="pad-btn pad-jump" id="pad-jump">跳跃</button>
+            <button type="button" class="pad-btn pad-atk" id="pad-atk">攻击<small>长按蓄力</small></button>
+          </div>
+        </div>
         <div id="battle-over" class="hidden">
           <h3>本局结束（战败零损失）</h3>
           <ul class="stats">
@@ -145,7 +156,7 @@
           </div>
         </div>
       </div>
-      <p class="hint" id="battle-tip">操作：← → / A D 移动 · ↑ / W / 空格 跳跃 · J 攻击 · 1/2 切换武器 · 手持两面三尖刀时<b>长按 J 蓄力 8 秒</b>，蓄满松开释放「法天象地」（怪从左右两侧进场，本期只做陆军）</p>
+      <p class="hint" id="battle-tip">键盘：← → / A D 移动 · ↑ / W / 空格 跳跃 · J 攻击 · 1/2 切换武器 · 手机：左半屏滑动=移动摇杆，右下角<b>跳跃</b> / <b>按住攻击蓄力</b> / <b>换武器</b> · 手持两面三尖刀时<b>长按攻击键蓄力 8 秒</b>，蓄满松开释放「法天象地」（怪从左右两侧进场，本期只做陆军）</p>
     </section>
   </main>
 

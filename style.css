@@ -261,6 +261,81 @@ select, input[type="text"] {
   font-size: 14px;
 }
 .hud b { font-size: 16px; color: var(--green); }
+
+/* ===== 手机触屏操作层（左半屏浮动摇杆 + 右下功能键）=====
+   桌面（鼠标）环境不显示；只在粗指针/触屏设备或窄屏出现。
+   整层 touch-action: none，避免拖动时被浏览器当成滚动/缩放手势抢走。 */
+.touch-pad { display: none; }
+@media (pointer: coarse), (max-width: 900px) {
+  .touch-pad {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 1;                       /* 低于 #battle-over，保证结算页按钮仍可点 */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+}
+.touch-pad.pad-off { display: none !important; }   /* 战局结束/不在战斗中：收起，避免挡住结算页 */
+.pad-left  { position: absolute; left: 0; top: 0; bottom: 0; width: 50%; touch-action: none; }
+.pad-right { position: absolute; right: 0; top: 0; bottom: 0; width: 50%; pointer-events: none; }
+
+/* 浮动摇杆：手指落在左半屏哪里，摇杆就出现在哪里 */
+.joy-base {
+  position: absolute;
+  display: none;
+  width: 116px; height: 116px;
+  margin: -58px 0 0 -58px;            /* 以手指落点为中心 */
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+.joy-knob {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 50px; height: 50px;
+  border-radius: 50%;
+  background: rgba(15, 110, 86, 0.72);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  transform: translate(-50%, -50%);
+}
+
+/* 右下功能键 */
+.pad-btn {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  background: rgba(15, 110, 86, 0.62);
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  transition: transform 0.06s ease, background 0.06s ease;
+}
+.pad-btn:focus-visible { outline: 3px solid #ffd94a; outline-offset: 2px; }
+.pad-btn.is-down { transform: scale(0.93); background: rgba(15, 110, 86, 0.92); }   /* 按下即反馈 */
+.pad-atk {
+  right: 18px; bottom: 18px;
+  width: 84px; height: 84px;
+  border-radius: 50%;
+  font-size: 17px;
+}
+.pad-atk small { display: block; font-size: 10px; font-weight: 400; opacity: 0.85; margin-top: 2px; }
+.pad-jump { right: 116px; bottom: 30px; width: 66px; height: 66px; border-radius: 50%; }
+.pad-swap {
+  right: 18px; bottom: 116px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+.pad-swap b { display: block; font-size: 12px; font-weight: 400; opacity: 0.9; }
 .battle-wrap { position: relative; width: 1200px; max-width: 100%; margin: 0 auto; }  /* 游戏画面居中 */
 #battle-canvas {
   width: 100%;
