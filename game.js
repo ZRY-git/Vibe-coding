@@ -133,6 +133,9 @@ function showView(id) {
   else stopCharPreview();
   if (id === "view-learn") renderPacks();
   window.scrollTo(0, 0);
+  syncOrientation();
+  // 触屏 + 已经是横屏：顺着这次点击把全屏一起申请了（无用户手势时浏览器会拒绝，已兜底）
+  if (id === "view-battle" && isCoarsePointer() && isLandscape()) enterFullscreen();
 }
 
 // ============ 主页渲染 ============
@@ -997,11 +1000,72 @@ function markTitleSaved() {
   }, 1600);
 }
 
+// ============ 手机：横屏铺满 + 竖屏引导（Day 11 追加） ============
+// 同样坚持「不动战斗逻辑」的原则：这里只根据「是否触屏 + 当前方向 + 是否在战斗页」
+// 给 body 挂/摘 CSS 类，排版交给 style.css；输入仍然全部汇入同一张 battle.keys。
+const isCoarsePointer = () => !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+const isLandscape = () => window.innerWidth > window.innerHeight;
+const inBattleView = () => document.querySelector("#view-battle.active") !== null;
+const rotateMask = $("#rotate-mask");
+const padFs = $("#pad-fs"), padFsLabel = $("#pad-fs-label");
+let portraitDismissed = false;   // 用户点了「仍要竖屏玩」就不再打扰
+
+function isFullscreenNow() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+// 全屏 + 旋转锁定：两个 API 都可能不存在或被浏览器拒绝（iOS Safari 不支持 orientation.lock，
+// 无用户手势时 requestFullscreen 也会被拒），一律静默降级——失败就停留原样，不影响游戏本身。
+function requestIn(elem, method) {
+  const t = elem || document.documentElement;
+  const fn = t && t[method];
+  if (typeof fn !== "function") return Promise.reject(new Error("unsupported"));
+  try { const r = fn.call(t); return (r && r.catch) ? r : Promise.resolve(); }
+  catch (e) { return Promise.reject(e); }
+}
+function enterFullscreen(target) {
+  requestIn(target || $("#view-battle"), "requestFullscreen")
+    .catch(() => requestIn(target || $("#view-battle"), "webkitRequestFullscreen"))
+    .catch(() => { /* 进不了全屏也没关系，横屏布局本身已经铺满 */ });
+  try {
+    const so = screen.orientation || screen.msOrientation;
+    if (so && so.lock) { const r = so.lock("landscape"); if (r && r.catch) r.catch(() => {}); }
+  } catch (e) { /* 不支持锁定方向的设备忽略 */ }
+}
+function exitFullscreen() {
+  requestIn(document, "exitFullscreen")
+    .catch(() => requestIn(document, "webkitExitFullscreen"))
+    .catch(() => {});
+}
+function toggleFullscreen() { if (isFullscreenNow()) exitFullscreen(); else enterFullscreen(); }
+
+// 方向/类名同步：横屏 → 铺满；竖屏 → 弹出引导（除非已被用户关掉）
+function syncOrientation() {
+  const touch = isCoarsePointer();
+  const battle = inBattleView();
+  const land = isLandscape();
+  document.body.classList.toggle("landscape-game", touch && land && battle);
+  const warn = touch && battle && !land && !portraitDismissed && !isFullscreenNow();
+  if (rotateMask) rotateMask.classList.toggle("hidden", !warn);
+  if (padFsLabel) padFsLabel.textContent = isFullscreenNow() ? "⤢ 退出" : "⛶ 全屏";
+  if (padFs) padFs.style.display = touch ? "" : "none";   // 桌面隐藏全屏按钮（桌面用系统快捷键）
+}
+window.addEventListener("resize", syncOrientation);
+window.addEventListener("orientationchange", () => setTimeout(syncOrientation, 250));
+document.addEventListener("fullscreenchange", syncOrientation);
+if (padFs) {
+  padFs.addEventListener("pointerdown", e => { e.preventDefault(); toggleFullscreen(); });
+  padFs.addEventListener("contextmenu", e => e.preventDefault());
+}
+const rotFs = $("#btn-rotate-fs"), rotSkip = $("#btn-rotate-skip");
+if (rotFs) rotFs.addEventListener("click", () => { enterFullscreen(); });
+if (rotSkip) rotSkip.addEventListener("click", () => { portraitDismissed = true; syncOrientation(); });
+
 // ============ 事件绑定 ============
 document.addEventListener("DOMContentLoaded", () => {
   renderHome();
   renderPacks();
   startCharPreview();   // 首屏即主页，直接开播待机动画
+  syncOrientation();    // 方向/全屏状态与 body 类名对齐
   $$(".char-choice").forEach(btn => btn.addEventListener("click", () => {
     state.character = btn.dataset.char;
     saveAll();

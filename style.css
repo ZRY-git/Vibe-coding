@@ -336,6 +336,97 @@ select, input[type="text"] {
   font-size: 13px;
 }
 .pad-swap b { display: block; font-size: 12px; font-weight: 400; opacity: 0.9; }
+.pad-fs {                                   /* 全屏开关：右上角，随手点到，不占操作区 */
+  right: 14px; top: 12px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+/* ===== 手机竖屏：引导转横屏（可关闭，不强制） ===== */
+.rotate-mask {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(18, 22, 18, 0.94);
+  color: #f5ecd8;
+  text-align: center;
+  padding: 24px;
+}
+.rotate-mask.hidden { display: none; }
+.rotate-mask h3 { margin: 0 0 10px; font-size: 20px; }
+.rotate-mask .rotate-text { color: #e7dfcb; font-size: 14px; line-height: 1.7; margin: 0 0 18px; }
+.rotate-mask .row { justify-content: center; }
+.rotate-phone {
+  width: 54px; height: 92px;
+  margin: 0 auto 16px;
+  border: 3px solid rgba(245, 236, 216, 0.85);
+  border-radius: 10px;
+  animation: rotatePhone 2.2s ease-in-out infinite;   /* 演示「转一下」这个动作 */
+}
+@keyframes rotatePhone {
+  0%, 30% { transform: rotate(0deg); }
+  62%, 100% { transform: rotate(-90deg); }
+}
+
+/* ===== 手机横屏：游戏区铺满屏幕 =====
+   仅在「触屏 + 横屏 + 正在战斗页」时由 game.js 给 body 挂上 .landscape-game。
+   做法：隐藏页头页脚与说明文字，战斗页变成撑满视口的 flex 列，画布按原始 2:1 比例拉到最高。 */
+body.landscape-game main { padding: 0; }
+body.landscape-game .topbar,
+body.landscape-game .foot,
+body.landscape-game #view-battle > h2,
+body.landscape-game #battle-tip { display: none; }
+body.landscape-game #view-battle {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;            /* 兜底：老浏览器不支持 dvh */
+  height: 100dvh;           /* 手机地址栏收起/展开也能铺满 */
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  background: none;
+  overflow: hidden;
+}
+body.landscape-game .hud {
+  flex: none;
+  margin: 0;
+  padding: 5px 12px;
+  gap: 14px;
+  font-size: 12px;
+  border-radius: 0;
+  border-width: 0 0 1px;
+  background: rgba(255, 255, 255, 0.75);
+}
+body.landscape-game .hud b { font-size: 14px; }
+body.landscape-game .battle-wrap {
+  flex: 1 1 auto;
+  min-height: 0;            /* 关键：允许子项压到视口高度以内，画布才不会被顶出屏幕 */
+  width: 100%;
+  max-width: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+body.landscape-game #battle-canvas {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+/* 矮屏（多数手机横屏只有 360~430px 高）：按键等比缩小，别占掉半个屏幕 */
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 480px) {
+  .joy-base { width: 92px; height: 92px; margin: -46px 0 0 -46px; }
+  .joy-knob { width: 42px; height: 42px; }
+  .pad-atk { right: 14px; bottom: 14px; width: 72px; height: 72px; font-size: 15px; }
+  .pad-jump { right: 100px; bottom: 22px; width: 58px; height: 58px; font-size: 14px; }
+  .pad-swap { right: 14px; bottom: 94px; padding: 6px 10px; font-size: 12px; }
+  .pad-fs { right: 12px; top: 10px; padding: 5px 8px; font-size: 11px; }
+}
 .battle-wrap { position: relative; width: 1200px; max-width: 100%; margin: 0 auto; }  /* 游戏画面居中 */
 #battle-canvas {
   width: 100%;
@@ -472,6 +563,7 @@ select, input[type="text"] {
 @media (prefers-reduced-motion: reduce) {
   .title-feedback { transition: none; transform: none; }
   .title-row.flash { animation: none; background: rgba(245, 236, 216, 0.2); }
+  .rotate-phone { animation: none; transform: rotate(-90deg); }   /* 静态演示最终的横向姿态 */
 }
 
 /* 加练 · 焦点状态：深木底上默认的墨绿描边对比不足，改用金色 */

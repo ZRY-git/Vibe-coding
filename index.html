@@ -136,6 +136,7 @@
             <div class="joy-base" id="joy-base"><span class="joy-knob" id="joy-knob"></span></div>
           </div>
           <div class="pad-right">
+            <button type="button" class="pad-btn pad-fs" id="pad-fs" title="切换全屏"><span id="pad-fs-label">⛶ 全屏</span></button>
             <button type="button" class="pad-btn pad-swap" id="pad-swap">换武器<b id="pad-swap-name">血染荒城</b></button>
             <button type="button" class="pad-btn pad-jump" id="pad-jump">跳跃</button>
             <button type="button" class="pad-btn pad-atk" id="pad-atk">攻击<small>长按蓄力</small></button>
@@ -156,9 +157,22 @@
           </div>
         </div>
       </div>
-      <p class="hint" id="battle-tip">键盘：← → / A D 移动 · ↑ / W / 空格 跳跃 · J 攻击 · 1/2 切换武器 · 手机：左半屏滑动=移动摇杆，右下角<b>跳跃</b> / <b>按住攻击蓄力</b> / <b>换武器</b> · 手持两面三尖刀时<b>长按攻击键蓄力 8 秒</b>，蓄满松开释放「法天象地」（怪从左右两侧进场，本期只做陆军）</p>
+      <p class="hint" id="battle-tip">键盘：← → / A D 移动 · ↑ / W / 空格 跳跃 · J 攻击 · 1/2 切换武器 · 手机：左半屏滑动=移动摇杆，右下角<b>跳跃</b> / <b>按住攻击蓄力</b> / <b>换武器</b>，右下角<b>⛶</b>切换全屏 · 手持两面三尖刀时<b>长按攻击键蓄力 8 秒</b>，蓄满松开释放「法天象地」（怪从左右两侧进场，本期只做陆军）</p>
     </section>
   </main>
+
+  <!-- 手机竖屏时的「请横屏」引导：不强制，用户可以关掉继续竖屏玩 -->
+  <div id="rotate-mask" class="rotate-mask hidden" role="dialog" aria-label="建议横屏游玩">
+    <div class="rotate-inner">
+      <div class="rotate-phone" aria-hidden="true"></div>
+      <h3>请横屏游玩</h3>
+      <p class="rotate-text">把手机转成横向，画面会自动铺满屏幕：<br>左半屏任意位置 = 移动摇杆，右下角 = 跳跃 / 攻击（长按蓄力）/ 换武器</p>
+      <div class="row">
+        <button class="primary" id="btn-rotate-fs">横屏全屏</button>
+        <button id="btn-rotate-skip">仍要竖屏玩</button>
+      </div>
+    </div>
+  </div>
 
   <footer class="foot">
     <p>本地单机版 · 数据存在浏览器里 · 无登录无后端</p>
