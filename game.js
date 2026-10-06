@@ -62,7 +62,11 @@ function saveAll() {
 }
 
 // ============ 派生属性（面板 4 项） ============
-const attackPower = () => 1 + state.weapon;                        // 血染荒城 +1
+// Day 14 起攻击力改为「角色基础 + 手持武器固定加成」：装备即固定，不再随拥有数量叠加。
+// 依赖下方 WEAPONS 注册表，因此只在运行期（渲染 / 事件）调用，模块顶层不会提前触发它。
+const BASE_ATK = 10;                                               // 角色自带攻击力
+const EMPTY_HAND = { name: "空手", atkBonus: 0, baseMul: 1, swingTime: 0.25, swingCd: 0.1, range: 60, knockback: 0 };
+const attackPower = () => BASE_ATK + activeWeapon().atkBonus;
 const defensePower = () => 0;                                      // 暂无防具来源
 const speedPct = () => 100 + 5 * Math.floor(state.stamina / 10);   // 每 10 点体力 +5%
 const moveSpeed = () => 2.6 * (speedPct() / 100);                  // 战斗内实际移速
@@ -262,7 +266,7 @@ function finishLearning() {
       <h3>本组学习完成，奖励到账！</h3>
       <ul>
         <li>体力 +5（现 ${state.stamina}）</li>
-        <li>血染荒城 +1（攻击力 ${attackPower()}）</li>
+        <li>血染荒城 +1（现共 ×${state.weapon}，可供战斗切换手持）</li>
         <li>workbuddy挂坠 +1（分数获得效率 +20%）</li>
       </ul>
       <p class="hint">移动速度现为 ${speedPct()}%，只增不减。</p>
@@ -287,16 +291,58 @@ weaponImgLong.src = "assets/血染荒城-hand-long.png";
 const weapon2Img = new Image();
 weapon2Img.src = "assets/两面三尖刀-hand.png";
 
-// 武器注册表（Day 11 追加：战斗中按 1/2 切换手上武器）
+// 武器注册表（Day 11 追加：战斗中按 1/2 切换手上武器；Day 14 规范化：五个维度齐全）
 // lean = 贴图自带的倾斜补偿角：血染荒城手持图斜 32.5°，两面三尖刀已转正为 0°
 // drawH = 画布上的持握高度。血染荒城长柄版 734×697，drawH 186 ≈ 原 148/556 的放大倍率（0.266），
 //         即刀头渲染尺寸与旧版完全一致，只有柄变长；grip 按新素材柄末端实测 (0.599, 1.00)
-// 注意：挥砍命中判定用的是固定 60px 范围，与 drawH 无关，改大小不影响平衡
+// 战斗数据五维度（Day 14 定案）：
+//   ① 攻击力提升 atkBonus —— 装备即固定（学几组都一样，只影响「是否拥有」）
+//   ② 倍率 baseMul / skillMul —— 基础攻击倍率（挥砍）/ 技能倍率（血染荒城的闪电冲击波）
+//   ③ 攻击速度 swingTime / swingCd —— 挥砍时长 / 冷却；周期 = 两者之和
+//   ④ 攻击范围 range + rangeDesc —— 数值本次不动（60px），描述待实机确认后定型
+//   ⑤ 击退力 knockback —— 只在「这一击没打死」时推，单位 px
+// 挥砍命中判定用 range，与 drawH（贴图大小）无关，改贴图不影响平衡
 const WEAPONS = {
-  1: { name: "血染荒城",   img: weaponImgLong, lean: 32.5, gripX: 0.599, gripY: 1.00, drawH: 186, owned: () => state.weapon > 0 },
-  2: { name: "两面三尖刀", img: weapon2Img,    lean: 0,    gripX: 0.524, gripY: 1.00, drawH: 240, owned: () => state.weapon2 > 0 }
+  1: {
+    name: "血染荒城",   img: weaponImgLong, lean: 32.5, gripX: 0.599, gripY: 1.00, drawH: 186,
+    atkBonus: 10,          // ① 攻击力提升：装备即固定
+    baseMul: 1.00,         // ② 基础攻击倍率：挥砍 = 攻击力 × 100%
+    skillMul: 5.00,        // ② 技能倍率：闪电冲击波 = 攻击力 × 500% × 该道波的命中序号
+    swingTime: 0.25,       // ③ 挥砍时长（秒）
+    swingCd: 0.10,         // ③ 冷却（秒）；周期 0.35s
+    range: 60,             // ④ 判定范围（px，本次不动）
+    rangeDesc: "一个身位",  // ④ 范围的自然语言描述（实机确认后定型）
+    knockback: 5,          // ⑤ 击退力（px）
+    owned: () => state.weapon > 0
+  },
+  2: {
+    name: "两面三尖刀", img: weapon2Img,    lean: 0,    gripX: 0.524, gripY: 1.00, drawH: 240,
+    atkBonus: 20,          // ① 攻击力提升：装备即固定
+    baseMul: 2.00,         // ② 基础攻击倍率：挥砍 = 攻击力 × 200%（蓄力未满再乘当前放大倍数）
+    skillMul: null,        // ② 技能倍率：本武器技能是「法天象地」形态，倍率见 GIANT_DMG_MUL
+    swingTime: 0.60,       // ③ 挥砍时长（秒）
+    swingCd: 0.20,         // ③ 冷却（秒）；周期 0.80s
+    range: 60,             // ④ 判定范围（px，本次不动）
+    rangeDesc: "一个身位",  // ④ 范围的自然语言描述（实机确认后定型）
+    knockback: 10,         // ⑤ 击退力（px）
+    owned: () => state.weapon2 > 0
+  }
 };
 const curWeapon = () => WEAPONS[state.activeWeapon] || WEAPONS[1];
+// 当前「生效」的武器数据：手上那把若还没拥有，一律按空手算（角色仍能挥砍，只是没有武器加成）
+function activeWeapon() {
+  const w = curWeapon();
+  return w.owned() ? w : EMPTY_HAND;
+}
+// 本次挥砍伤害（Day 14 统一公式）：
+//   攻击力 × 基础倍率 × 武器放大倍数（蓄力进度，1~2）× 法天象地伤害倍率
+//   倍数取 p.swingScale（挥砍那一刻定格的），不能现算 weaponScale —— 蓄力松手后 p.charge 会立刻清零
+//   血染荒城不能蓄力、也不会进入法天象地 → 恒为 攻击力 × 100% = 20
+//   两面三尖刀：短按 30 × 200% = 60；蓄力未满松手再乘定格倍数；法天象地期间倍数定格为 2、再乘 ×2 → 满值 240
+function swingDamage(p) {
+  const w = activeWeapon();
+  return Math.round(attackPower() * w.baseMul * (p.swingScale || 1) * (p.giant ? GIANT_DMG_MUL : 1));
+}
 
 // 当前应显示的精灵帧（draw 与 drawWeapon 共用，保证武器和身体始终同一帧）
 // 同时返回该帧的右手锚点 hand，避免调用方再去猜 sheet/frame 的对应关系
@@ -336,7 +382,7 @@ function drawWeapon(p) {
   const base = (45 + w.lean) * Math.PI / 180; // 平时 45° 斜握（叠加贴图固有倾角）
   let ang;
   if (p.slamming) ang = base + 135 * Math.PI / 180;   // 快速下砸时：枪头朝正下
-  else if (p.swing > 0) ang = L + (1 - p.swing / SWING_TIME) * 90 * Math.PI / 180;   // 挥砍：枪头从 90°(上) 抡到 0°(前)
+  else if (p.swing > 0) ang = L + (1 - p.swing / (p.swingDur || 0.25)) * 90 * Math.PI / 180;   // 挥砍：枪头从 90°(上) 抡到 0°(前)，进度按本次挥砍时长算（两把武器时长不同）
   else ang = base;
   ctx.rotate(ang);
   ctx.drawImage(w.img, -gripX, -gripY, W, H);
@@ -347,16 +393,18 @@ const CVW = 1200, CVH = 600, GROUND = 550, GRAV = 0.55, JUMP = -11;
 // 血染荒城技能参数（下砸 500px/s，冲击波传播 300px/s，换算成每帧 px）
 const SLAM_FALL = 500 / 60;          // 空中按 J 快速下砸
 const SHOCK_SPEED = 300 / 60;        // 闪电冲击波向左右传播
-const SHOCK_DMG = 10;                // 冲击波伤害
-const SWING_TIME = 0.25;             // 挥砍动画时长（秒）
-const SWING_CD = 0.1;                // 挥砍完成后的冷却（秒）
-const SWING_RANGE = 60;              // 挥砍判定范围（面前多少 px 内吃到剑气）
+// 挥砍时长 / 冷却 / 判定范围 / 击退力已按武器收进 WEAPONS 注册表（Day 14 武器规范化），此处不再放全局常量
+const KB_SPEED = 120;                // 击退释放速度（px/s）：把 5~10px 的击退量在 0.04~0.08 秒内走完，像被顶了一下
+// 小怪血量：第 1 波 20 点，每深一波 ×1.052 后向上取整（Day 14 定案：n = 波次 − 1）
+const WAVE_HP_BASE = 20;
+const WAVE_HP_GROWTH = 1.052;
 // 三尖两面刀技能「法天象地」：长按 J 蓄力 8s，武器长宽均匀涨到 2 倍；蓄满松开进入法天象地
 const CHARGE_TIME = 8;               // 蓄满所需秒数
 const CHARGE_MAX = 2;                // 蓄满时武器的长宽倍数
 const CHARGE_DELAY = 0.35;           // 按住超过这个时长才转入蓄力（更短的按下仍算普通挥砍）
 const GIANT_GROW = 0.5, GIANT_HOLD = 5, GIANT_SHRINK = 1;   // 0.5s 变大 / 5s 持续 / 1s 恢复（时间节点不变）
 const GIANT_MAX = 3;                 // 法天象地最大体型倍率（长宽 ×3）；与武器倍率 CHARGE_MAX 互相独立
+const GIANT_DMG_MUL = 2;             // 法天象地期间挥砍伤害倍率（与蓄力放大倍数叠加，满值 240）
 let battle = null;
 
 function createBattle() {
@@ -364,7 +412,7 @@ function createBattle() {
     wave: 1, kills: 0, over: false, raf: 0, last: performance.now(),
     player: {
       x: CVW / 2 - 14, y: GROUND - 44, w: 28, h: 44, bw: 28, bh: 44,   // bw/bh：原始碰撞盒，法天象地时按体型倍率缩放
-      vy: 0, hp: 10, face: 1, cd: 0, swing: 0, inv: 0, onGround: true,
+      vy: 0, hp: 10, face: 1, cd: 0, swing: 0, swingDur: 0.25, swingScale: 1, inv: 0, onGround: true,
       slamming: false, swingHits: new Set(),   // swingHits：本次挥砍已命中的敌人
       moving: false, animT: 0,                 // 动画：是否在走 / 动画累计时间
       // 三尖两面刀技能状态
@@ -381,13 +429,14 @@ function createBattle() {
   };
 }
 
-function waveHp(w) { return 2 + Math.floor(w / 2); }       // 波次越深越厚
+function waveHp(w) { return Math.ceil(WAVE_HP_BASE * Math.pow(WAVE_HP_GROWTH, w - 1)); }   // 第 1 波 20，每波 ×1.052 向上取整
 function waveSpeed(w) { return Math.min(2.2, 0.8 + w * 0.15); }
 function waveDmg(w) { return 1 + Math.floor(w / 3); }
 
 // 血染荒城：在落地点生成一道闪电冲击波（第一道传 50px 消失，第二道传 100px 消失）
+// hitSeq：本道波已命中几只怪 —— 伤害随序号递增（第 1 只 ×1、第 2 只 ×2…），每道波各自从 1 起数
 function spawnShock(b, tier) {
-  b.shockwaves.push({ x: b.slamX, d: 0, maxD: tier === 1 ? 50 : 100, tier, hits: new Set() });
+  b.shockwaves.push({ x: b.slamX, d: 0, maxD: tier === 1 ? 50 : 100, tier, hits: new Set(), hitSeq: 0 });
 }
 
 function spawnMonster(b) {
@@ -397,7 +446,8 @@ function spawnMonster(b) {
     id: b.mobId++,
     x: fromLeft ? -w - 4 : CVW + 4, y: GROUND - h, w, h,
     vx: fromLeft ? waveSpeed(b.wave) : -waveSpeed(b.wave),
-    hp: waveHp(b.wave), maxHp: waveHp(b.wave), dmg: waveDmg(b.wave)
+    hp: waveHp(b.wave), maxHp: waveHp(b.wave), dmg: waveDmg(b.wave),
+    kb: 0, kbDir: 1   // 击退：剩余待推 px 与方向（1 = 向右），由挥砍命中时写入、怪物移动时逐帧释放
   });
 }
 
@@ -413,13 +463,16 @@ function weaponScale(p) {
   if (p.charge > 0) return 1 + (p.charge / CHARGE_TIME) * (CHARGE_MAX - 1);
   return 1;
 }
-// 触发一次挥砍：rangeScale 作用于判定范围；法天象地期间时长与冷却都翻倍（伤害在判定处 ×2）
+// 触发一次挥砍：rangeScale 作用于判定范围；时长与冷却按当前武器取
+// （Day 14 起不再因法天象地翻倍 —— 形态只放大伤害与范围，手感保持一致）
 function fireSwing(p, rangeScale) {
-  const g = p.giant !== null;
-  const t = SWING_TIME * (g ? 2 : 1);
-  p.cd = t + SWING_CD * (g ? 2 : 1);
+  const w = activeWeapon();
+  const t = w.swingTime;
+  p.cd = t + w.swingCd;
   p.swing = t;
+  p.swingDur = t;
   p.swingRange = rangeScale || 1;
+  p.swingScale = weaponScale(p);   // 定格本次挥砍的武器放大倍数（蓄力松手后 p.charge 会被立刻清零，不能事后重算）
   p.swingHits = new Set();
 }
 function startGiant(p) {
@@ -535,15 +588,21 @@ function update(k, dt) {
   }
   // 剑气伤害：白弧（剑气）出现的挥砍期间才判定，每只怪每次挥砍只中一次
   if (p.swing > 0) {
-    const range = SWING_RANGE * (p.swingRange || 1);
+    const w = activeWeapon();
+    const range = w.range * (p.swingRange || 1);
     const x1 = p.face > 0 ? p.x + p.w : p.x - range;
     b.monsters.forEach(m => {
       if (p.swingHits.has(m.id)) return;
       const overlapY = m.y + m.h > p.y && m.y < p.y + p.h;
       const overlapX = m.x < x1 + range && m.x + m.w > x1;
       if (overlapY && overlapX) {
-        m.hp -= attackPower() * (p.giant ? 2 : 1);   // 法天象地期间伤害翻倍
+        m.hp -= swingDamage(p);   // 攻击力 × 武器基础倍率 × 放大倍数 × 法天象地倍率
         p.swingHits.add(m.id);
+        // 击退：只有「这一击没打死」才推，方向为远离玩家（独立字段，在下方怪物移动处释放）
+        if (m.hp > 0 && w.knockback > 0) {
+          m.kb = w.knockback;
+          m.kbDir = m.x + m.w / 2 >= p.x + p.w / 2 ? 1 : -1;
+        }
       }
     });
   }
@@ -561,6 +620,12 @@ function update(k, dt) {
     const dir = p.x + p.w / 2 > m.x + m.w / 2 ? 1 : -1;
     m.vx = dir * waveSpeed(b.wave);
     m.x += m.vx * k;
+    // 击退位移：独立字段逐帧释放 —— 若直接写进 m.vx，下一帧就会被上面的行走逻辑覆盖掉
+    if (m.kb > 0) {
+      const step = Math.min(m.kb, KB_SPEED * k);
+      m.x += (m.kbDir || 1) * step;
+      m.kb -= step;
+    }
   });
   // 法天象地：全程无敌；仅「最大体型的 5 秒」内碰到的小怪直接秒杀（变大/恢复过程只无敌不秒）
   const giantInv = p.giant !== null, giantKill = p.giant === "hold";
@@ -579,7 +644,7 @@ function update(k, dt) {
     b.shockTimer -= dt / 1000;
     if (b.shockTimer <= 0) spawnShock(b, 2);
   }
-  // 闪电冲击波：以 100px/s 向左右同时传播，贴地命中敌人造成 10 点伤害（每只怪每道波只中一次）
+  // 闪电冲击波：贴地命中敌人，伤害 = 攻击力 × 技能倍率 × 本道波的命中序号（第 1 只 100、第 2 只 200…）
   b.shockwaves.forEach(s => {
     s.d += SHOCK_SPEED * k;
     const lx = s.x - s.d, rx = s.x + s.d;
@@ -588,7 +653,12 @@ function update(k, dt) {
       const nearGround = m.y + m.h > GROUND - 40;
       const hitL = lx > m.x - 6 && lx < m.x + m.w + 6;
       const hitR = rx > m.x - 6 && rx < m.x + m.w + 6;
-      if (nearGround && (hitL || hitR)) { m.hp -= SHOCK_DMG; s.hits.add(m.id); }
+      if (nearGround && (hitL || hitR)) {
+        s.hitSeq++;   // 每道波各自从 1 起数：第 n 只被打到的怪受 n 倍技能伤害
+        const sw = WEAPONS[1];
+        m.hp -= Math.round((BASE_ATK + sw.atkBonus) * (sw.skillMul || 1) * s.hitSeq);
+        s.hits.add(m.id);
+      }
     });
   });
   b.shockwaves = b.shockwaves.filter(s => s.d < s.maxD);
