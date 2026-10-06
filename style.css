@@ -644,3 +644,240 @@ body.landscape-game #battle-canvas {
   outline: 2px solid #ffd94a;
   outline-offset: 2px;
 }
+
+/* ===== 视图导航（Day 13）=====
+   作用域：全部挂 .page-home 前缀，不漏进游戏版。
+   导航是 <a href="#/...">，跳转交给浏览器原生 hash 行为，不写 JS 点击逻辑。
+   颜色只用 :root 变量；选中态复用 --green / --green-soft。 */
+
+/* 跳到主要内容（加练）：平时移出视口，键盘 Tab 聚焦时才露出 */
+.page-home .skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  padding: 8px 14px;
+  background: var(--green);
+  color: var(--card);
+  border-radius: 0 0 8px 0;
+  text-decoration: none;
+  transform: translateY(-120%);
+}
+.page-home .skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+/* 跳到主内容后，让落点看得见（键盘用户不会「跳完不知道自己在哪」） */
+.page-home #main-content:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 4px;
+}
+
+/* 导航行：导航标签在左，「返回上一页」在右 */
+.page-home .nav-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 0 32px 4px;
+}
+.page-home .page-nav {
+  display: flex;
+  flex-wrap: wrap;          /* 窄屏折行，不横向撑破 */
+  gap: 8px;
+}
+.page-home .nav-link {
+  font-size: 14px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted-strong);
+  text-decoration: none;
+}
+.page-home .nav-link.is-on {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--card);
+}
+.page-home .nav-back {
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted-strong);
+  cursor: pointer;
+}
+.page-home .nav-back[hidden] { display: none; }
+.page-home .nav-link:focus-visible,
+.page-home .nav-back:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+/* 面包屑（加练）：显示当前在第几级，除最后一级外都能点回去 */
+.page-home .crumbs { padding: 0 32px 6px; }
+.page-home .crumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.page-home .crumbs li { display: flex; align-items: center; }
+.page-home .crumbs li + li::before {
+  content: "/";
+  margin: 0 6px;
+  color: var(--muted);
+}
+.page-home .crumbs a { color: var(--green); text-decoration: none; }
+.page-home .crumbs a:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.page-home .crumbs [aria-current="page"] { color: var(--muted-strong); }
+
+/* ===== 列表四种数据状态（Day 13）=====
+   正常 = 筛选栏 + 列表；加载中 / 空数据 / 出错 = 收起筛选栏，换成对应状态块。
+   [hidden] 要显式写出来，否则会被 .word-filter 的 display:flex 压过去而失效。 */
+.page-home .word-filter[hidden],
+.page-home .word-list[hidden],
+.page-home .list-state[hidden] { display: none; }
+
+/* 数据状态演示条：四个状态各对应一个地址 + 一个模拟真实加载的按钮 */
+.page-home .state-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0 0 10px;
+}
+.page-home .state-chip,
+.page-home .state-sim,
+.page-home .state-btn {
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted-strong);
+  text-decoration: none;
+  cursor: pointer;
+}
+.page-home .state-chip.is-on {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--card);
+}
+.page-home .state-sim { border-radius: 8px; background: var(--card); }
+.page-home .state-chip:focus-visible,
+.page-home .state-sim:focus-visible,
+.page-home .state-btn:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+/* 状态说明行：当前是哪种状态、它意味着什么 */
+.page-home .state-note {
+  margin: 0 0 14px;
+  padding-left: 10px;
+  border-left: 3px solid var(--line);
+  font-size: 13px;
+  color: var(--muted-strong);
+}
+
+/* 状态块外壳：骨架屏 / 空数据 / 出错共用，保证三态视觉一致 */
+.page-home .list-state { margin-bottom: 12px; }
+.page-home .state-block {
+  padding: 24px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  text-align: center;
+}
+.page-home .state-title { margin: 0 0 6px; font-size: 15px; }
+.page-home .state-text {
+  margin: 0 auto 14px;
+  max-width: 440px;
+  font-size: 13px;
+  color: var(--muted-strong);
+}
+.page-home .state-error { border-color: var(--green); }
+.page-home .state-btn {
+  background: var(--green-soft);
+  border-color: var(--green);
+  color: var(--green);
+  font-weight: 600;
+}
+
+/* 骨架屏：一条条排得跟 .word-item 一样，加载完成时页面不跳位 */
+.page-home .skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+  text-align: left;
+}
+.page-home .skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.page-home .skeleton-bar {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--bg);
+  animation: skeletonPulse 1.2s ease-in-out infinite;
+}
+.page-home .skeleton-bar.bar-a { width: 84px; }
+.page-home .skeleton-bar.bar-b { flex: 1; }
+.page-home .skeleton-bar.bar-c { width: 68px; }
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* ===== 关于视图（Day 13）===== */
+.page-home .about-lead {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--muted-strong);
+}
+.page-home .about-lead code,
+.page-home .about-list code {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--bg);
+  font-size: 13px;
+}
+.page-home .about-list {
+  margin: 0 0 16px;
+  padding-left: 20px;
+  font-size: 14px;
+}
+.page-home .about-list li { margin-bottom: 6px; }
+#view-about > h3 {
+  margin: 18px 0 8px;
+  font-size: 15px;
+  border-left: 4px solid var(--green);
+  padding-left: 10px;
+}
+
+/* 窄屏：状态条按钮随内容折行，不压字也不横向溢出
+   （导航内边距保持 32px，与 .topbar / main 对齐，不单独改） */
+@media (max-width: 560px) {
+  .page-home .state-bar { width: 100%; }
+  .page-home .state-block { padding: 20px 12px; }
+}
+
+/* 减少动效偏好：骨架屏不闪，保持静态占位 */
+@media (prefers-reduced-motion: reduce) {
+  .page-home .skeleton-bar { animation: none; }
+}
