@@ -519,6 +519,77 @@ body.landscape-game #battle-canvas {
 .page-home .hint { margin: 16px 0 0; padding-left: 16px; }
 .page-home .foot { color: var(--muted-strong); }
 
+/* ===== 单词列表筛选栏（Day 12）=====
+   作用域：全部挂 .page-home 前缀，不漏进游戏版。
+   颜色只用 :root 变量，不新增裸色值；选中态复用 --green / --green-soft。 */
+.page-home .word-filter {
+  display: flex;
+  flex-wrap: wrap;          /* 窄屏换行，宁可折行也不横向撑破 */
+  align-items: center;
+  gap: 8px 14px;
+  margin: 0 0 12px;
+}
+.page-home .filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.page-home .filter-label { font-size: 13px; color: var(--muted-strong); }
+
+.page-home .filter-input {
+  font: inherit;
+  font-size: 14px;
+  min-width: 190px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+}
+
+/* 状态按钮：未选中=浅底描边，选中=实心主色 + aria-pressed=true */
+.page-home .filter-chip,
+.page-home .filter-clear {
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted-strong);
+  cursor: pointer;
+}
+.page-home .filter-clear { border-radius: 8px; background: var(--card); }
+.page-home .filter-chip.is-on {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--card);
+}
+.page-home .filter-chip:focus-visible,
+.page-home .filter-clear:focus-visible,
+.page-home .filter-input:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.page-home .filter-count { margin: 0; font-size: 13px; color: var(--muted-strong); }
+.page-home .filter-count.is-empty { color: var(--green); font-weight: 600; }
+
+/* 无结果空状态：占满列表宽度、居中，说明原因并给出出路 */
+.page-home .word-empty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--muted-strong);
+}
+
+/* 窄屏：输入框独占一行、按钮折行排列，避免压字与横向溢出 */
+@media (max-width: 560px) {
+  .page-home .filter-row { width: 100%; }
+  .page-home .filter-input { flex: 1 1 100%; min-width: 0; }
+}
+
 /* ===== 称号「设为展示」的三层反馈（Day 11） =====
    第 1 层即时反馈：沿用 Day 9 的全站 button:active 下沉，此处不重复做。
    本段只补第 2 层（按钮状态反馈）与第 3 层（结果确认反馈）。 */

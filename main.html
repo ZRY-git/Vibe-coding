@@ -19,6 +19,25 @@
       <div class="stat-grid" id="stat-grid"></div>
 
       <h2>单词列表</h2>
+      <!-- 筛选栏（Day 12）：状态 + 关键词叠加筛选，只描述条件，不复制数据 -->
+      <div class="word-filter" id="word-filter">
+        <div class="filter-row">
+          <label class="filter-label" for="filter-keyword">关键词</label>
+          <input class="filter-input" type="text" id="filter-keyword" placeholder="输入单词或释义，如 train">
+        </div>
+        <div class="filter-row" role="group" aria-labelledby="filter-status-label">
+          <span class="filter-label" id="filter-status-label">状态</span>
+          <button type="button" class="filter-chip is-on" data-status="all" aria-pressed="true">全部</button>
+          <button type="button" class="filter-chip" data-status="done" aria-pressed="false">已掌握</button>
+          <button type="button" class="filter-chip" data-status="doing" aria-pressed="false">学习中</button>
+          <button type="button" class="filter-chip" data-status="todo" aria-pressed="false">未开始</button>
+        </div>
+        <div class="filter-row">
+          <button type="button" class="filter-clear" id="filter-clear">清空筛选</button>
+          <!-- 结果计数：与列表一起更新，空结果时也要看得见 -->
+          <p class="filter-count" id="filter-count"></p>
+        </div>
+      </div>
       <!-- 单词列表：由 main.js 从 mock-data.js 读取渲染 -->
       <ul class="word-list" id="word-list"></ul>
       <p class="hint">以上为本地假数据（mock，来自 mock-data.js），第 3 周才接真实 API。</p>
