@@ -405,6 +405,8 @@ const CHARGE_DELAY = 0.35;           // 按住超过这个时长才转入蓄力�
 const GIANT_GROW = 0.5, GIANT_HOLD = 5, GIANT_SHRINK = 1;   // 0.5s 变大 / 5s 持续 / 1s 恢复（时间节点不变）
 const GIANT_MAX = 3;                 // 法天象地最大体型倍率（长宽 ×3）；与武器倍率 CHARGE_MAX 互相独立
 const GIANT_DMG_MUL = 2;             // 法天象地期间挥砍伤害倍率（与蓄力放大倍数叠加，满值 240）
+const GIANT_TINT_MIN = 0.25;         // 法天象地金色滤镜浓度：体型 1 倍时
+const GIANT_TINT_MAX = 0.55;         // 法天象地金色滤镜浓度：满 3 倍时（越大越金，替代原来画在身外的椭圆金圈）
 let battle = null;
 
 function createBattle() {
@@ -499,6 +501,30 @@ function updateGiant(p, dt) {
   p.x = Math.max(0, Math.min(CVW - p.w, cx - p.w / 2));
   p.y = foot - p.h;
   if (p.y + p.h > GROUND) p.y = GROUND - p.h;
+}
+
+// 法天象地金色滤镜浓度：体型 1 倍 → GIANT_TINT_MIN，满 3 倍 → GIANT_TINT_MAX（沿用原来「越大越亮」的手感）
+function giantTintAlpha(p) {
+  const t = Math.min(1, Math.max(0, (p.giantScale - 1) / (GIANT_MAX - 1)));
+  return GIANT_TINT_MIN + (GIANT_TINT_MAX - GIANT_TINT_MIN) * t;
+}
+
+// 金色滤镜：把角色当前帧先画到一块复用的离屏画布，再叠一层金色，最后整块贴回主画布
+// 关键在 source-atop —— 只染「已有像素」，角色的透明区域仍是透明（否则会贴出一个金色方块），
+// 也不会像 ctx.filter 那样挑浏览器（老 iOS Safari 不认 filter），每帧只是一次 fillRect。
+let tintCv = null, tintCtx = null;
+function goldTint(img, sx, sy, sw, sh, alpha) {
+  if (!tintCv) { tintCv = document.createElement("canvas"); tintCtx = tintCv.getContext("2d"); }
+  if (tintCv.width !== sw || tintCv.height !== sh) { tintCv.width = sw; tintCv.height = sh; }
+  tintCtx.clearRect(0, 0, sw, sh);          // 上一帧的残留要清掉（改尺寸会自带清空，尺寸没变就得手动清）
+  tintCtx.imageSmoothingEnabled = false;    // 与主画布一致，保住像素风的硬边缘
+  tintCtx.globalCompositeOperation = "source-over";
+  tintCtx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+  tintCtx.globalCompositeOperation = "source-atop";
+  tintCtx.fillStyle = `rgba(255, 202, 64, ${alpha})`;
+  tintCtx.fillRect(0, 0, sw, sh);
+  tintCtx.globalCompositeOperation = "source-over";   // 复原，别把复合模式漏给下一次调用
+  return tintCv;
 }
 
 function startBattle() {
@@ -806,11 +832,14 @@ function draw() {
   if (sheet.img.complete && sheet.img.naturalWidth) {
     const fw = sheet.img.naturalWidth / sheet.frames, fh = sheet.img.naturalHeight;
     const H = 128 * p.giantScale, W = H * fw / fh;   // 精灵 128px 高，法天象地时随体型倍率放大（脚踩盒底）
+    // 法天象地：给角色本体套金色滤镜（离屏染色后整块贴回），替代原来画在身外的椭圆金圈
+    const tinted = !!p.giant;
+    const src = tinted ? goldTint(sheet.img, fi * fw, 0, fw, fh, giantTintAlpha(p)) : sheet.img;
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     ctx.translate(p.x + p.w / 2, p.y + p.h);
     ctx.scale(p.face, 1);                     // 朝左时水平翻转
-    ctx.drawImage(sheet.img, fi * fw, 0, fw, fh, -W / 2, -H, W, H);
+    ctx.drawImage(src, tinted ? 0 : fi * fw, 0, fw, fh, -W / 2, -H, W, H);
     ctx.restore();
   } else {
     // 素材未加载完：回退绿色小方块（呼应 WorkBuddy 猫的绿）
@@ -821,17 +850,6 @@ function draw() {
     ctx.fillRect(eyeX, p.y + 8, 6, 6);
   }
   ctx.globalAlpha = 1;
-  // 法天象地：金色光环（体型倍率越大越亮），让「变大了」这件事一眼可见
-  if (p.giant) {
-    ctx.save();
-    // 透明度封顶 0.95：体型倍率已是 3，不封顶会算出 alpha=1.35 的非法颜色导致描边失效
-    ctx.strokeStyle = `rgba(255, 208, 64, ${Math.min(0.95, 0.35 + 0.5 * (p.giantScale - 1))})`;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.ellipse(p.x + p.w / 2, p.y + p.h / 2, p.w * 0.85, p.h * 0.62, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-  }
   const handPos = drawWeapon(p);   // 当前手持武器挂在手上（按 1/2 切换），返回手部世界坐标
   // 刀光（圆心对齐当前帧的手部，跟随角色与朝向；范围随武器倍率一起变大）
   if (p.swing > 0 && handPos) {
