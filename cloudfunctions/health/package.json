@@ -1,0 +1,7 @@
+{
+  "name": "health",
+  "version": "1.0.0",
+  "description": "Day 15 健康检查云函数：GET /api/health，证明后端公网可达",
+  "main": "index.js",
+  "dependencies": {}
+}
